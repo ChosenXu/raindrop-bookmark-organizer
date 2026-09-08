@@ -6,7 +6,7 @@
 
 **Rationale.**
 
-1. MCP `update_bookmarks` requires a `tags` **object** whose semantics were unverified at design time (possibly replace-style `{"old":"new"}` rather than assignment). REST `PUT /raindrop/{id}` natively accepts a tags **array** — verified 2026-09-08.
+1. MCP `update_bookmarks` requires a `tags` **object** — verified 2026-09-08 to be an incremental delta `{add: [...], remove: [...]}`, not assignment. REST `PUT /raindrop/{id}` accepts a tags **array** with full assignment/replace semantics — also verified. For bulk tagging (assign from scratch), assignment is the natural primitive, hence REST for writes; MCP's add/remove remains useful for incremental adjustments.
 2. MCP error messages double as schema hints, but field names differ from REST (`link` vs `url`; `create_collections` requires `parent_id`). One canonical schema (REST) reduces mapping bugs.
 3. REST bulk list returns `excerpt/domain/type/tags` per item in pages of 50 — the metadata-first classification route needs exactly this and nothing more.
 4. Both channels share the same Bearer token, so mixing them has no extra credential cost.

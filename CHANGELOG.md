@@ -9,6 +9,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 - Project skeleton: SKILL.md (v1.0.0), scripts/, references/, docs/.
 - Architecture decision: hybrid channels — REST API v1 for writes + bulk reads, MCP for content reads (docs/decisions.md).
+- `scripts/rd_client.py`: REST client with verification readback, smoke test (`--smoke`), rate probe (`--rate-probe`).
+
+### Verified (2026-09-08)
+
+- REST `PUT /raindrop/{id}` tags = full assignment/replace semantics; update+readback loop verified on scratch data.
+- MCP `update_bookmarks` tags object = incremental delta `{add: [...], remove: [...]}` (probed with live seed + REST readback).
+- Rate limit: 40 rapid list GETs → zero 429s; per-request latency ~1.7s observed.
 
 ## [1.0.0]
 
