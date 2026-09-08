@@ -1,0 +1,10 @@
+# local state / caches — never commit
+*.worklog.jsonl
+*.state.json
+*.undo.json
+__pycache__/
+*.pyc
+.DS_Store
+# never commit credentials or reports
+*.token
+*.report.md
