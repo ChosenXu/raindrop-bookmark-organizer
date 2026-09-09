@@ -186,6 +186,78 @@ def cmd_plan(cls_path: Path, out: Path | None) -> int:
     return 0
 
 
+def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
+    """Write classified bookmarks back to Raindrop with verification.
+
+    Safety: pre-write undo snapshot per item; skip any bookmark that already
+    has tags (conflict guard); batches of 10; stop on first API failure;
+    worklog advances classified-dryrun -> applied / unverified / conflict-skip.
+    """
+    rc = RaindropClient()
+    records = json.loads(cls_path.read_text())
+    done = load_worklog()
+    pending = [r for r in records if r["id"] in done]
+    if limit:
+        pending = pending[:limit]
+    if not pending:
+        print("nothing pending (no classified-dryrun ids match this class file)")
+        return 0
+    undo_path = STATE_DIR / f"apply-{time.strftime('%Y%m%d-%H%M%S')}.undo.json"
+    print(f"applying {len(pending)} items (what={sorted(what)}), undo -> {undo_path}")
+
+    stats = {"requested": 0, "verified_ok": 0, "unverified": 0, "conflict_skip": 0}
+    snapshot: dict = {}
+
+    def flush_undo():
+        undo_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=1))
+
+    for i, r in enumerate(pending, 1):
+        rid = r["id"]
+        f = flatten(r)
+        note = r.get("proposed_note") or r.get("note_draft") or ""
+        try:
+            cur = rc.get(rid)
+        except RaindropError as e:
+            print(f"STOP at item {i} ({rid}): {e}")
+            flush_undo()
+            return 1
+        if cur is None:
+            print(f"skip {rid}: not found")
+            stats["conflict_skip"] += 1
+            log_state(rid, "conflict-skip")
+            continue
+        if cur.get("tags"):
+            print(f"skip {rid}: already has tags {cur['tags']} (conflict guard)")
+            stats["conflict_skip"] += 1
+            log_state(rid, "conflict-skip")
+            continue
+        snapshot[str(rid)] = {"title": cur.get("title", ""),
+                              "note": cur.get("note", ""),
+                              "tags": cur.get("tags") or []}
+        payload_note = note if "note" in what else None
+        payload_tags = f["tags"] if "tags" in what else None
+        try:
+            res = rc.update(rid, note=payload_note, tags=payload_tags)
+        except RaindropError as e:
+            print(f"STOP at item {i} ({rid}): {e}")
+            flush_undo()
+            return 1
+        stats["requested"] += 1
+        if res.get("applied"):
+            stats["verified_ok"] += 1
+            log_state(rid, "applied")
+        else:
+            stats["unverified"] += 1
+            log_state(rid, "unverified")
+            print(f"UNVERIFIED {rid}")
+        if i % 10 == 0 or i == len(pending):
+            flush_undo()
+            print(f"  progress {i}/{len(pending)}: {stats}")
+    flush_undo()
+    print(f"DONE {stats}")
+    return 0 if stats["unverified"] == 0 else 1
+
+
 def cmd_stats() -> int:
     rc = RaindropClient()
     u = rc.user()["statistics"]["bookmarks"]
@@ -204,6 +276,10 @@ def main() -> int:
     cp = sub.add_parser("plan")
     cp.add_argument("--class", dest="cls", type=Path, required=True)
     cp.add_argument("--out", type=Path, default=None)
+    ap = sub.add_parser("apply")
+    ap.add_argument("--class", dest="cls", type=Path, required=True)
+    ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--what", default="note,tags", help="comma list: note,tags")
     sub.add_parser("stats")
     a = p.parse_args()
     try:
@@ -211,6 +287,9 @@ def main() -> int:
             return cmd_pull(a.sample, a.out)
         if a.cmd == "plan":
             return cmd_plan(a.cls, a.out)
+        if a.cmd == "apply":
+            what = {x.strip() for x in a.what.split(",") if x.strip()}
+            return cmd_apply(a.cls, a.limit, what)
         if a.cmd == "stats":
             return cmd_stats()
     except RaindropError as e:
