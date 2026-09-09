@@ -12,7 +12,7 @@ version: 1.0.0
 Batch-organize Raindrop.io bookmarks with a three-step workflow:
 
 1. **命名 (title)** — conservative rewrite of garbage titles only (opt-in, default OFF)
-2. **写描述 (note)** — one structured note per bookmark
+2. **写描述 (note)** — one structured note per bookmark: 1–2 sentences, "what it is + key highlight / when to reach for it", 40–80 字 (Chinese) / ~30–60 words (English); same language as skeleton tags; no marketing fluff, no repeating the title verbatim.
 3. **打标签 (tags)** — three-axis controlled vocabulary
 
 Design principle: **metadata first**. The Raindrop list API returns title/link/domain/excerpt/type per bookmark in bulk — no webpage fetching needed for classification. Deep-fetch (`fetch_bookmark_content`) is reserved for a low-confidence subset (≤30%).
@@ -69,6 +69,7 @@ Load only when needed:
 
 - `references/vocabulary.md` — default skeleton vocabulary (always load before tagging)
 - `references/vocabulary.custom.example.md` — template for the user's personal extension file
+- `scripts/organize.py` — batch engine: candidate pull, checkpoint worklog, dry-run plan rendering
 - `docs/decisions.md` — architecture decisions and their rationale
 - `scripts/rd_client.py` — REST client: paginated reads, batched writes, verification readback
 
