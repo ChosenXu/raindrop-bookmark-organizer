@@ -55,14 +55,23 @@ class RaindropClient:
                 "Content-Type": "application/json",
             },
         )
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.loads(resp.read().decode())
-        except urllib.error.HTTPError as e:
-            body = e.read().decode(errors="replace")[:300]
-            if e.code == 429:
-                raise RaindropError(f"429 rate-limited on {method} {path}") from e
-            raise RaindropError(f"HTTP {e.code} on {method} {path}: {body}") from e
+        attempts = 4
+        for attempt in range(1, attempts + 1):
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    return json.loads(resp.read().decode())
+            except urllib.error.HTTPError as e:
+                body = e.read().decode(errors="replace")[:300]
+                if e.code == 429:
+                    raise RaindropError(f"429 rate-limited on {method} {path}") from e
+                raise RaindropError(f"HTTP {e.code} on {method} {path}: {body}") from e
+            except (urllib.error.URLError, OSError) as e:
+                # transient network/SSL failures: retry with backoff
+                if attempt == attempts:
+                    raise RaindropError(f"network error on {method} {path} after {attempts} attempts: {e}") from e
+                backoff = 3 * attempt
+                print(f"  [retry {attempt}/{attempts-1}] {method} {path}: {e} — backing off {backoff}s", flush=True)
+                time.sleep(backoff)
 
     # -- reads -------------------------------------------------------------
     def user(self) -> dict:
