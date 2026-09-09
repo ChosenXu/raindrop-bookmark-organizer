@@ -43,14 +43,18 @@ Rules:
 
 What the bookmark **is** — decides how it will be used again.
 
-> 工具网站 tool · 组件 UI 库 ui-kit · 图标插画 icons-illustrations · 字体 fonts · 模板 templates · 素材库 assets-library · 开源项目 open-source · 文章教程 article · 文档手册 docs · 视频 video · 书影记录 review · 清单导航 directory · 社区论坛 community · 数据报告 report
+> 工具网站 tool · 组件 UI 库 ui-kit · 图标插画 icons-illustrations · 字体 fonts · 模板 templates · 素材库 assets-library · 媒体刊物 media · 开源项目 open-source · 文章教程 article · 文档手册 docs · 视频 video · 书影记录 review · 清单导航 directory · 社区论坛 community · 数据报告 report
 
 Rules:
 - Exactly one Type per bookmark. Pick the dominant form.
-- **素材库**：可浏览、可下载的资产集合（纹理、插画、照片、UI kit、音效等）。要点是"东西多、按需取用"。
+- **工具网站**：可操作的交互式工具（计算器、转换器、生成器、小游戏等），核心是"用"。新闻站、杂志、博客等编辑型出版物**不是**工具网站——它们打 `媒体刊物`。
+- **媒体刊物**：以持续发布内容为目的的编辑型站点——新闻网站、杂志、博客、独立刊物。首页/栏目页/单篇文章都属此形态；主题由领域表达（资讯/设计/影音文化…）。
+- **素材库**：可浏览、可下载的资产集合（纹理、插画、照片、UI kit、音效、镜像文件等）。要点是"东西多、按需取用"。
+- **文章教程**：**单篇**可一口气读完的文章或教程页面，不是站点首页或栏目页。
 - **清单导航**：指向别处的链接/条目汇编（榜单、导航站、片单），自身不是资产。
 - **书影记录**：条目型书影页面（豆瓣/IMDb 风格），记录看过的作品。
 - Type=开源项目 时不加状态标签"开源"（若状态轴开启）。
+- 判据提示：Raindrop 自动识别的单篇文章 `type=article`、URL 含 /blog/ /post/ /2024/ 式路径、摘要为正文开头——这些信号指向 `文章教程`；首页、栏目页、官网主页指向 `媒体刊物`/`工具网站`/其他站点形态。
 
 ## Axis 3 · 状态 Status（可选 0–2 个；**默认关闭，按标签选择性开启**）
 
@@ -61,7 +65,7 @@ Rules:
 - `status_axis_enabled: true` — all seven tags active;
 - `status_tags: [...]` — a selective list, e.g. `[待读, 精华]`.
 
-**Selective-enable rule:** 工作流标签（待读/精华）只适用于**文章类内容**（Type = 文章教程，含视频课程等"要花时间消化"的形态）；属性标签（免费/开源/付费/中文/英文）适用于任何形态。开启的标签仍按"明确为真才打，存疑不打"执行。
+**Selective-enable rule:** 工作流标签（待读/精华）只适用于**单篇文章页**（形态 = 文章教程，且是具体某一篇，可通过 Raindrop `type=article`、文章式 URL 路径、正文式摘要识别）。**站点级书签——新闻网站、杂志首页、专栏、博客首页——一律不打待读/精华**，无论其内容多值得读。属性标签（免费/开源/付费/中文/英文）适用于任何形态。开启的标签仍按"明确为真才打，存疑不打"执行。
 
 ## Free supplementary tags（自由补充标签，0–2 个）
 

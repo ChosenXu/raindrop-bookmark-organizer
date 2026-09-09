@@ -14,8 +14,9 @@ tag_language: zh
 #   status_axis_enabled: true
 # or enable selectively — a list drawn from:
 #   待读, 精华, 免费, 开源, 付费, 中文, 英文
-# Workflow tags (待读/精华) apply only to article-type content
-# (Type = 文章教程 and similar time-to-consume forms); property tags
+# Workflow tags (待读/精华) apply ONLY to single-article pages
+# (Type = 文章教程, i.e. one readable piece — never to site-level
+# bookmarks such as news/magazine homepages or columns); property tags
 # (免费/开源/付费/中文/英文) apply to any form.
 status_tags: [待读, 精华]
 
