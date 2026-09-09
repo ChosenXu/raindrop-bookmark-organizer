@@ -94,13 +94,16 @@ MUTEX_LEAF_TYPE = {"字体": "字体", "图标": "图标插画", "组件库": "�
 
 
 def flatten(rec: dict) -> dict:
-    """Normalize a class record: accept structured (domain/type/status/free)
-    or legacy flat proposed_tags, return dict with roles + flat tags."""
+    """Normalize a class record: accept structured (domain_tags/type/status/free)
+    or legacy flat proposed_tags, return dict with roles + flat tags.
+    Note: rec["domain"] (site domain string) is source metadata, never tags."""
     if "type" in rec:  # structured
-        tags = [*rec.get("domain", []), rec["type"], *rec.get("status", []), *rec.get("free", [])]
-        return {"domain": list(rec.get("domain", [])), "type": rec["type"],
-                "status": list(rec.get("status", [])), "free": list(rec.get("free", [])),
-                "tags": tags}
+        dom = list(rec.get("domain_tags") or [])
+        st = list(rec.get("status") or [])
+        free = list(rec.get("free") or [])
+        typ = rec["type"]
+        return {"domain": dom, "type": typ, "status": st, "free": free,
+                "tags": [*dom, typ, *st, *free]}
     # legacy flat: infer type = first tag belonging to a group
     t = rec.get("proposed_tags", [])
     typ = next((x for x in t if x in GROUPS), "")
@@ -167,7 +170,7 @@ def cmd_plan(cls_path: Path, out: Path | None) -> int:
     ]
     for r in records:
         f = flatten(r)
-        t = (r.get("proposed_note") or "").replace("|", "／")
+        t = (r.get("proposed_note") or r.get("note_draft") or "").replace("|", "／")
         tags = ", ".join(f["tags"])
         title = (r.get("title") or "")[:36]
         lines.append(
