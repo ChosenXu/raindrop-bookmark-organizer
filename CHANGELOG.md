@@ -10,6 +10,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - Project skeleton: SKILL.md (v1.0.0), scripts/, references/, docs/.
 - Architecture decision: hybrid channels — REST API v1 for writes + bulk reads, MCP for content reads (docs/decisions.md).
 - `scripts/rd_client.py`: REST client with verification readback, smoke test (`--smoke`), rate probe (`--rate-probe`).
+- Two-layer tag vocabulary: universal three-axis skeleton (`references/vocabulary.md`, zh/en) + optional personal extension file (`vocabulary.custom.example.md` template) for private domains, renames, status-axis toggle, tag language and collection mapping. Tag cap: 6 per bookmark.
 
 ### Verified (2026-09-08)
 

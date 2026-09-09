@@ -27,6 +27,17 @@
 
 **Rule.** After every mutating call, read back the affected item(s) via REST and count `verified_ok` against `requested`. Any mismatch → item marked `UNVERIFIED`, processing stops at batch end.
 
+## D6 · Two-layer vocabulary for multi-user generality (2026-09-09)
+
+**Decision.** The tag skeleton (`references/vocabulary.md`) is a universal default — ten domains, one type axis, one status axis, free-tag rules — designed to apply to any Raindrop library with zero configuration. Personalization lives in an optional user-created `vocabulary.custom.md` (template shipped as `vocabulary.custom.example.md`): private domains, renames, status-axis on/off, tag language, collection mapping.
+
+**Rationale.** The skill is built for sharing. A vocabulary hardwired to one person's collections (e.g. his Design/AI/Douban tree) would not survive contact with someone else's library; a fully open vocabulary would fragment into synonym soup at 1000+ bookmarks. The two-layer split keeps the skeleton consistent and machine-verifiable while giving each user an escape hatch. Loading order: custom overrides default; absent custom → defaults only.
+
+**Consequences.**
+- Collection alignment is an optional enhancement (mapping in custom file → suggestions only, never auto-move). This keeps the door open for a future "sort unsorted bookmarks into collections" mode without coupling v1 to any collection structure.
+- Skeleton changes are versioned amendments; users solve gaps with free tags (≤2, lowercase proper nouns), not by inventing skeleton tags.
+- zh/en canonical columns in the default file; other languages ride the same inheritance route as the eagle skill (explicit > invocation language > default zh).
+
 ## D5 · Token hygiene (2026-09-08)
 
 The Raindrop API token grants full read/write to the library. It is injected via `RD_API_TOKEN` at runtime. It must never appear in repo files, skill files, logs, or reports. Reports go to `/tmp/` only.
