@@ -41,20 +41,57 @@ Rules:
 
 ## Axis 2 · 形态 Type（必选 1 个）
 
-What the bookmark **is** — decides how it will be used again.
+What the bookmark **is** — decides how it will be used again. 16 types in 5 semantic groups; classify by group first ("是拿来用的 / 看的 / 取的 / 找的 / 认人的"), then pick the member. Tags are flat when written.
 
-> 工具网站 tool · 组件 UI 库 ui-kit · 图标插画 icons-illustrations · 字体 fonts · 模板 templates · 素材库 assets-library · 媒体刊物 media · 开源项目 open-source · 文章教程 article · 文档手册 docs · 视频 video · 书影记录 review · 清单导航 directory · 社区论坛 community · 数据报告 report
+### A · 资产类 — 拿来取用的东西
 
-Rules:
-- Exactly one Type per bookmark. Pick the dominant form.
-- **工具网站**：可操作的交互式工具（计算器、转换器、生成器、小游戏等），核心是"用"。新闻站、杂志、博客等编辑型出版物**不是**工具网站——它们打 `媒体刊物`。
-- **媒体刊物**：以持续发布内容为目的的编辑型站点——新闻网站、杂志、博客、独立刊物。首页/栏目页/单篇文章都属此形态；主题由领域表达（资讯/设计/影音文化…）。
-- **素材库**：可浏览、可下载的资产集合（纹理、插画、照片、UI kit、音效、镜像文件等）。要点是"东西多、按需取用"。
-- **文章教程**：**单篇**可一口气读完的文章或教程页面，不是站点首页或栏目页。
-- **清单导航**：指向别处的链接/条目汇编（榜单、导航站、片单），自身不是资产。
-- **书影记录**：条目型书影页面（豆瓣/IMDb 风格），记录看过的作品。
+| Type | Definition |
+|---|---|
+| 组件 UI 库 ui-kit | 可复用的界面组件集合 |
+| 图标插画 icons-illustrations | 图标、插画素材页面 |
+| 字体 fonts | 字型文件与字族展示页 |
+| 模板 templates | 可套用的成品框架（网页、演示、简历、动效模板） |
+| 素材库 assets-library | 多件可下载资产的集合（纹理、照片、音效、镜像文件等） |
+
+### B · 交互类 — 拿来操作的东西
+
+| Type | Definition |
+|---|---|
+| 工具网站 tool | 可操作的交互式工具：计算器、转换器、生成器、网页小游戏。**仅此而已**——营销官网、博客、杂志都不是工具网站 |
+| 开源项目 open-source | 代码仓库与项目主页 |
+
+### C · 内容类 — 拿来消费的东西
+
+| Type | Definition |
+|---|---|
+| 媒体刊物 media | 持续发布内容的编辑型站点：新闻网站、杂志、**个人博客**。首页/栏目页/单篇文章都属此形态 |
+| 文章教程 article | **单篇**可一口气读完的文章或教程页面 |
+| 文档手册 docs | 参考文档、手册、百科、API 文档 |
+| 视频 video | 视频内容页 |
+| 书影记录 review | 条目型书影页面（豆瓣/IMDb 风格），记录看过的作品 |
+| 数据报告 report | 报告、榜单、调研与数据集 |
+
+### D · 检索类 — 帮你找到别的东西
+
+| Type | Definition |
+|---|---|
+| 清单导航 directory | 指向别处的链接/条目汇编（导航站、榜单、片单、聚合页） |
+| 社区论坛 community | 讨论与问答社区 |
+
+### E · 身份类 — 认识"这是谁做的"
+
+| Type | Definition |
+|---|---|
+| 作品集 portfolio | 个人或团队的自我展示与作品陈列（个人主页、studio 作品页） |
+| 官网 official-site | 公司或产品的官方网站（含产品的营销首页） |
+
+### Boundary rules（形态轴内部边界）
+
+- **个人博客 vs 作品集**：博客是持续发内容的出版物 → `媒体刊物`（看内容）；主页是自我介绍与作品陈列 → E 组（看人看作品）。同一作者两者都有时，按**存的那一页**判。
+- **官网 vs 工具网站**：描述工具的营销首页 → `官网`；工具本体（打开即用的 web app）→ `工具网站`。
+- **作品集 vs 素材库**：陈列**自己的**作品 → `作品集`；第三方可取用资产的**集合** → `素材库`。灵感向的作品聚合站（收集多人的作品）→ `清单导航` 或 `素材库`，不打 `作品集`。
 - Type=开源项目 时不加状态标签"开源"（若状态轴开启）。
-- 判据提示：Raindrop 自动识别的单篇文章 `type=article`、URL 含 /blog/ /post/ /2024/ 式路径、摘要为正文开头——这些信号指向 `文章教程`；首页、栏目页、官网主页指向 `媒体刊物`/`工具网站`/其他站点形态。
+- 判据提示：Raindrop 自动识别的单篇文章 `type=article`、URL 含 /blog/ /post/ /2024/ 式路径、摘要为正文开头——指向 `文章教程`；域名根路径/首页、about/work 类栏目——指向 E 组；正文式长摘要+持续更新感——指向 `媒体刊物`。
 
 ## Axis 3 · 状态 Status（可选 0–2 个；**默认关闭，按标签选择性开启**）
 
