@@ -10,10 +10,14 @@ Every field is optional. Anything omitted falls back to the default skeleton.
 tag_language: zh
 
 ## Status axis
-# Whole axis off by default. Set true to enable all status tags, or list
-# individual tags to enable selectively (subset of: 待读, 精华, 免费, 开源, 付费, 中文, 英文).
-status_axis_enabled: false
-# status_tags: [待读, 精华]   # example: enable only workflow tags
+# Whole axis off by default. Either enable all:
+#   status_axis_enabled: true
+# or enable selectively — a list drawn from:
+#   待读, 精华, 免费, 开源, 付费, 中文, 英文
+# Workflow tags (待读/精华) apply only to article-type content
+# (Type = 文章教程 and similar time-to-consume forms); property tags
+# (免费/开源/付费/中文/英文) apply to any form.
+status_tags: [待读, 精华]
 
 ## Private domains（私有领域大类）
 # Append to the ten default domains; same two-level style, flat when written.

@@ -53,7 +53,7 @@ Free-plan constraint: MCP `search` parameters are Pro-only — never rely on the
 
 ## Vocabulary & language
 
-Tag skeleton: three axes (Domain 1–2, Type 1, Status 0–2 **off by default — enable via the custom file**) plus up to 2 free supplementary tags — **hard cap 6 tags per bookmark**. Mutual-exclusion rules live in the vocabulary file; never tag both sides of a conflicting pair. Full rules in `references/vocabulary.md`.
+Tag skeleton: three axes (Domain 1–2, Type 1, Status 0–2 **off by default — enable all or selectively via the custom file; workflow tags 待读/精华 apply only to article-type content**) plus up to 2 free supplementary tags — **hard cap 6 tags per bookmark**. Mutual-exclusion rules live in the vocabulary file; never tag both sides of a conflicting pair. Full rules in `references/vocabulary.md`.
 
 Loading order:
 1. If `references/vocabulary.custom.md` exists (user-created from the provided example template), read it first — it overrides/extends the skeleton: tag language, status-axis on/off, private domains, renames, optional collection mapping.

@@ -52,13 +52,16 @@ Rules:
 - **书影记录**：条目型书影页面（豆瓣/IMDb 风格），记录看过的作品。
 - Type=开源项目 时不加状态标签"开源"（若状态轴开启）。
 
-## Axis 3 · 状态 Status（可选 0–2 个；**默认关闭**）
+## Axis 3 · 状态 Status（可选 0–2 个；**默认关闭，按标签选择性开启**）
 
 > 待读 to-read · 精华 starred · 免费 free · 开源 oss · 付费 paid · 中文 zh · 英文 en
 
-**Default: the whole axis is off.** It adds a decision per bookmark; enable it via `status_axis_enabled: true` (or a selective tag list) in `vocabulary.custom.md` when wanted.
+**Default: the whole axis is off.** Enable via `vocabulary.custom.md` in one of two ways:
 
-待读/星级 are personal workflow tags; 免费/开源/付费/中文/英文 are property tags. Apply only when clearly true — when in doubt, omit.
+- `status_axis_enabled: true` — all seven tags active;
+- `status_tags: [...]` — a selective list, e.g. `[待读, 精华]`.
+
+**Selective-enable rule:** 工作流标签（待读/精华）只适用于**文章类内容**（Type = 文章教程，含视频课程等"要花时间消化"的形态）；属性标签（免费/开源/付费/中文/英文）适用于任何形态。开启的标签仍按"明确为真才打，存疑不打"执行。
 
 ## Free supplementary tags（自由补充标签，0–2 个）
 
