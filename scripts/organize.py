@@ -83,6 +83,67 @@ def cmd_pull(sample: int, out: Path | None) -> int:
     return 0
 
 
+GROUPS = {  # type member -> semantic group
+    "组件 UI 库": "A", "图标插画": "A", "字体": "A", "模板": "A", "素材库": "A",
+    "工具网站": "B", "开源项目": "B",
+    "媒体刊物": "C", "文章教程": "C", "文档手册": "C", "视频": "C", "书影记录": "C", "数据报告": "C",
+    "清单导航": "D", "社区论坛": "D",
+    "作品集": "E", "官网": "E",
+}
+MUTEX_LEAF_TYPE = {"字体": "字体", "图标": "图标插画", "组件库": "组件 UI 库"}
+
+
+def flatten(rec: dict) -> dict:
+    """Normalize a class record: accept structured (domain/type/status/free)
+    or legacy flat proposed_tags, return dict with roles + flat tags."""
+    if "type" in rec:  # structured
+        tags = [*rec.get("domain", []), rec["type"], *rec.get("status", []), *rec.get("free", [])]
+        return {"domain": list(rec.get("domain", [])), "type": rec["type"],
+                "status": list(rec.get("status", [])), "free": list(rec.get("free", [])),
+                "tags": tags}
+    # legacy flat: infer type = first tag belonging to a group
+    t = rec.get("proposed_tags", [])
+    typ = next((x for x in t if x in GROUPS), "")
+    st = [x for x in t if x in {"待读", "精华", "免费", "开源", "付费", "中文", "英文"}]
+    dom = [x for x in t if x != typ and x not in st and _is_domain(x)]
+    free = [x for x in t if x != typ and x not in st and x not in dom]
+    return {"domain": dom, "type": typ, "status": st, "free": free, "tags": t}
+
+
+def _is_domain(x: str) -> bool:
+    return x in {"开发", "设计", "AI", "产品效率", "数码硬件", "影音文化",
+                 "阅读学习", "科学", "资讯", "实用工具"} or x in {
+        "前端", "后端", "移动端", "组件库", "开发工具", "UI 参考", "灵感集", "图标",
+        "配色", "动效", "排版", "3D", "AI 工具", "AI 资讯", "Agent", "模型评测",
+        "效率工具", "笔记知识库", "协作", "自动化", "数码产品", "智能家居",
+        "电影", "书籍", "游戏", "音乐", "课程", "语言学习", "科普",
+        "科研", "数学", "科技资讯", "设计资讯", "周刊日报", "查询计算", "安全隐私"}
+
+
+def validate(rec: dict) -> list[str]:
+    """Role-aware rule check. Returns list of issue strings (empty = pass)."""
+    f = flatten(rec)
+    issues = []
+    if len(f["tags"]) > 6:
+        issues.append("cap>6")
+    if not f["type"] or f["type"] not in GROUPS:
+        issues.append(f"type-invalid:{f['type']!r}")
+    if not 1 <= len(f["domain"]) <= 2:
+        issues.append(f"domain-count:{f['domain']}")
+    for leaf, typ in MUTEX_LEAF_TYPE.items():
+        if leaf in f["domain"] and f["type"] == typ:
+            issues.append(f"mutex:{leaf}+{typ}")
+    if f["type"] == "开源项目" and "开源" in f["status"]:
+        issues.append("mutex:开源项目+开源")
+    if "待读" in f["status"] and f["type"] != "文章教程":
+        issues.append("待读-not-single-article")
+    allowed_status = {"待读", "精华"}  # user's selective enablement
+    bad = set(f["status"]) - allowed_status
+    if bad:
+        issues.append(f"status-not-enabled:{sorted(bad)}")
+    return issues
+
+
 def cmd_plan(cls_path: Path, out: Path | None) -> int:
     """Render classification JSON into a review plan. Zero writes."""
     records = json.loads(cls_path.read_text())
@@ -90,18 +151,24 @@ def cmd_plan(cls_path: Path, out: Path | None) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     n_ok = sum(1 for r in records if r.get("tier") != "manual")
     by_tier: dict[str, int] = {}
+    all_issues = {}
     for r in records:
         by_tier[r.get("tier", "?")] = by_tier.get(r.get("tier", "?"), 0) + 1
+        v = validate(r)
+        if v:
+            all_issues[r["id"]] = v
     lines = [
         "# Dry-run plan (NO writes performed)",
         f"- items: {len(records)} · classifiable: {n_ok} · by tier: {by_tier}",
+        f"- validation: {'ALL PASS' if not all_issues else all_issues}",
         "",
         "| id | title | domain | proposed note | proposed tags | conf | tier |",
         "|---|---|---|---|---|---|---|",
     ]
     for r in records:
+        f = flatten(r)
         t = (r.get("proposed_note") or "").replace("|", "／")
-        tags = ", ".join(r.get("proposed_tags") or [])
+        tags = ", ".join(f["tags"])
         title = (r.get("title") or "")[:36]
         lines.append(
             f"| {r['id']} | {title} | {r.get('domain','')[:24]} "
@@ -111,7 +178,8 @@ def cmd_plan(cls_path: Path, out: Path | None) -> int:
         lines += ["", "## Manual list (needs human decision)", ""]
         lines += [f"- {r['id']} {r.get('title','')[:60]} — {r.get('reason','')}" for r in manual]
     out.write_text("\n".join(lines) + "\n")
-    print(f"plan -> {out} ({len(records)} items, tiers={by_tier})")
+    print(f"plan -> {out} ({len(records)} items, tiers={by_tier}, "
+          f"validation={'ALL PASS' if not all_issues else all_issues})")
     return 0
 
 
