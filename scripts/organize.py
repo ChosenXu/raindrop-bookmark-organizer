@@ -36,10 +36,16 @@ def log_state(rid: int, status: str) -> None:
                             "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}) + "\n")
 
 
-def load_worklog() -> set[int]:
+def load_worklog() -> dict[int, str]:
+    """id -> latest status (applied / unverified / conflict-skip / classified-dryrun)."""
     if not WORKLOG.exists():
-        return set()
-    return {json.loads(l)["id"] for l in WORKLOG.read_text().splitlines() if l.strip()}
+        return {}
+    out: dict[int, str] = {}
+    for line in WORKLOG.read_text().splitlines():
+        if line.strip():
+            e = json.loads(line)
+            out[e["id"]] = e["status"]
+    return out
 
 
 def pull_untagged(rc: RaindropClient) -> list[dict]:
@@ -129,10 +135,15 @@ def validate(rec: dict) -> list[str]:
     issues = []
     if len(f["tags"]) > 6:
         issues.append("cap>6")
+    if len(set(f["tags"])) != len(f["tags"]):
+        issues.append("duplicate-tags")
     if not f["type"] or f["type"] not in GROUPS:
         issues.append(f"type-invalid:{f['type']!r}")
     if not 1 <= len(f["domain"]) <= 2:
         issues.append(f"domain-count:{f['domain']}")
+    bad_dom = [x for x in f["domain"] if not _is_domain(x)]
+    if bad_dom:
+        issues.append(f"domain-membership:{bad_dom}")
     for leaf, typ in MUTEX_LEAF_TYPE.items():
         if leaf in f["domain"] and f["type"] == typ:
             issues.append(f"mutex:{leaf}+{typ}")
@@ -195,8 +206,8 @@ def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
     """
     rc = RaindropClient()
     records = json.loads(cls_path.read_text())
-    done = load_worklog()
-    pending = [r for r in records if r["id"] in done]
+    status = load_worklog()
+    pending = [r for r in records if status.get(r["id"]) == "classified-dryrun"]
     if limit:
         pending = pending[:limit]
     if not pending:
@@ -260,10 +271,14 @@ def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
 
 def cmd_stats() -> int:
     rc = RaindropClient()
-    u = rc.user()["statistics"]["bookmarks"]
+    items = rc.list_all(0)
+    total = len(items)
+    tagged = sum(1 for x in items if x.get("tags"))
+    noted = sum(1 for x in items if (x.get("note") or "").strip())
     done = load_worklog()
-    print(f"library: total={u['total']} has_tags={u['has_tags']} lacks_tags={u['lacks_tags']}")
-    print(f"worklog entries: {len(done)}")
+    from collections import Counter
+    print(f"library: total={total} tagged={tagged} ({tagged*100//max(total,1)}%) noted={noted}")
+    print(f"worklog: {dict(Counter(done.values()))}")
     return 0
 
 
