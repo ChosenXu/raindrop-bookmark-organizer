@@ -6,6 +6,20 @@ All notable changes to this skill are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 格式参考 Keep a Changelog，版本号遵循语义化版本（SemVer）。
 
+## [1.1.0] - 2026-09-10
+
+### Added / 新增
+
+- Cross-agent portability: the skill now presents itself as a platform-neutral Agent Skill (SKILL.md open standard); the README documents install paths for Claude Code, Codex CLI, Gemini CLI, Copilot, Cursor and WorkBuddy.
+  跨 Agent 可移植：Skill 以平台中立的 Agent Skill 定位呈现（SKILL.md 开放标准）；README 载明 Claude Code、Codex CLI、Gemini CLI、Copilot、Cursor 与 WorkBuddy 的安装路径。
+- Portable state directory: default `~/.raindrop-organizer/`, overridable via `RD_ORGANIZER_STATE_DIR`; the legacy `~/.workbuddy/raindrop-organizer/` is still honored when it exists (with a one-time migration hint).
+  状态目录可移植：默认 `~/.raindrop-organizer/`，可用 `RD_ORGANIZER_STATE_DIR` 覆盖；旧目录 `~/.workbuddy/raindrop-organizer/` 存在时仍沿用（附一次性迁移提示）。
+
+### Changed / 变更
+
+- SKILL.md description and architecture table now say "an optional Raindrop MCP server" instead of the WorkBuddy-specific "MCP connector" wording; frontmatter adds `license: MIT`; version bumped 1.0.0 → 1.1.0.
+  SKILL.md 描述与架构表改用通用的 "an optional Raindrop MCP server" 表述，替代 WorkBuddy 专属的 "MCP connector"；frontmatter 增加 `license: MIT`；版本 1.0.0 → 1.1.0。
+
 ## [1.0.0] - 2026-09-10
 
 First release. Battle-tested end-to-end on a real 1,101-bookmark library: 37 batches, 100% tagged + annotated, zero structural violations.

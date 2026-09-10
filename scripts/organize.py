@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """organize.py — batch engine for raindrop-bookmark-organizer.
 
-State dir: ~/.workbuddy/raindrop-organizer/  (outside the repo, persistent)
+State dir: ~/.raindrop-organizer/  (outside the repo, persistent)
+  override with $RD_ORGANIZER_STATE_DIR; falls back to the legacy
+  ~/.workbuddy/raindrop-organizer/ when that directory already exists
   worklog.jsonl   one line per processed bookmark: {"id":..,"status":..,"ts":..}
   plan-*.md       dry-run plans (review artifacts)
 
@@ -17,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -24,7 +27,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from rd_client import RaindropClient, RaindropError  # noqa: E402
 
-STATE_DIR = Path.home() / ".workbuddy" / "raindrop-organizer"
+_NEW_STATE = Path.home() / ".raindrop-organizer"
+_LEGACY_STATE = Path.home() / ".workbuddy" / "raindrop-organizer"
+
+
+def _resolve_state_dir() -> Path:
+    """RD_ORGANIZER_STATE_DIR > legacy dir (if it exists) > ~/.raindrop-organizer."""
+    if env_dir := os.environ.get("RD_ORGANIZER_STATE_DIR"):
+        return Path(env_dir).expanduser()
+    if _LEGACY_STATE.exists():
+        return _LEGACY_STATE
+    return _NEW_STATE
+
+
+STATE_DIR = _resolve_state_dir()
 WORKLOG = STATE_DIR / "worklog.jsonl"
 DEFAULT_OUT = STATE_DIR
 
@@ -283,6 +299,13 @@ def cmd_stats() -> int:
 
 
 def main() -> int:
+    if STATE_DIR == _LEGACY_STATE:
+        print(
+            "[hint] legacy state dir in use (~/.workbuddy/raindrop-organizer).\n"
+            "  New default is ~/.raindrop-organizer — move the folder there or\n"
+            "  set RD_ORGANIZER_STATE_DIR to silence this hint.",
+            file=sys.stderr,
+        )
     p = argparse.ArgumentParser(description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
     sp = sub.add_parser("pull")

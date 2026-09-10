@@ -1,8 +1,9 @@
 ---
 name: raindrop-bookmark-organizer
-description: Use when the user wants to organize, tag, annotate, or rename bookmarks in their Raindrop.io library (via the raindrop MCP connector or the Raindrop REST API). Triggers on mentions of Raindrop, raindrop.io, 书签, bookmarks, 收藏 combined with a batch-organize intent (打标签 / 写描述 / 整理 / tag / annotate / organize). Produces a structured note and three-axis controlled tags for each bookmark; title rewriting is a conservative opt-in step. Supports checkpointed batch processing across sessions for libraries of 1000+ bookmarks.
+description: Use when the user wants to organize, tag, annotate, or rename bookmarks in their Raindrop.io library (via the Raindrop REST API and an optional Raindrop MCP server). Triggers on mentions of Raindrop, raindrop.io, 书签, bookmarks, 收藏 combined with a batch-organize intent (打标签 / 写描述 / 整理 / tag / annotate / organize). Produces a structured note and three-axis controlled tags for each bookmark; title rewriting is a conservative opt-in step. Supports checkpointed batch processing across sessions for libraries of 1000+ bookmarks.
 agent_created: true
-version: 1.0.0
+version: 1.1.0
+license: MIT
 ---
 
 # Raindrop Bookmark Organizer
@@ -24,7 +25,7 @@ Design principle: **metadata first**. The Raindrop list API returns title/link/d
 | Channel | Used for |
 |---|---|
 | Raindrop REST API v1 (`api.raindrop.io/rest/v1/...`) | all writes (note/tags) + bulk reads + verification readback |
-| `raindrop` MCP connector | semantic-adjacent reads only: `fetch_bookmark_content`, `fetch_popular_keywords`, `search_help_docs` |
+| Raindrop MCP server (optional) | semantic-adjacent reads only: `fetch_bookmark_content`, `fetch_popular_keywords`, `search_help_docs` |
 
 Free-plan constraint: MCP `search` parameters are Pro-only — never rely on them.
 

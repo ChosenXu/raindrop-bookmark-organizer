@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-A [WorkBuddy](https://www.workbuddy.cn/) skill that batch-organizes a [Raindrop.io](https://raindrop.io/) library with a proven three-step workflow — **name (optional) → annotate → tag**. Battle-tested end-to-end on a real 1,101-bookmark library: 37 batches, 100% tagged + annotated, zero structural violations.
+A cross-platform [Agent Skill](https://agentskills.my/) that batch-organizes a [Raindrop.io](https://raindrop.io/) library with a proven three-step workflow — **name (optional) → annotate → tag**. Works in any agent that reads the SKILL.md standard (Claude Code, Codex CLI, Gemini CLI, Copilot, Cursor, WorkBuddy…). Battle-tested end-to-end on a real 1,101-bookmark library: 37 batches, 100% tagged + annotated, zero structural violations.
 
 ## What it does
 
@@ -30,14 +30,23 @@ Tag output language is configurable: the skeleton ships with Simplified Chinese 
 
 ## Install
 
-Clone this repository into your WorkBuddy skills directory:
+Clone this repository into your agent's skills directory:
 
 ```bash
 git clone https://github.com/ChosenXu/raindrop-bookmark-organizer.git \
-  ~/.workbuddy/skills/raindrop-bookmark-organizer
+  <skills-dir>/raindrop-bookmark-organizer
 ```
 
-Or copy the folder manually into `~/.workbuddy/skills/`.
+| Agent | Skills directory |
+|---|---|
+| Claude Code | `~/.claude/skills/` (personal) or `.claude/skills/` (project) |
+| Codex CLI | `~/.codex/skills/` |
+| Gemini CLI | `~/.gemini/skills/` |
+| GitHub Copilot | `.github/skills/` |
+| Cursor | `.cursor/skills/` (project scope) |
+| WorkBuddy | `~/.workbuddy/skills/` |
+
+> `.agents/skills/` works as a universal fallback directory for most agents.
 
 ## Prerequisites
 
