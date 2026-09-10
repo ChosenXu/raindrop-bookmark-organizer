@@ -6,6 +6,18 @@ All notable changes to this skill are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 格式参考 Keep a Changelog，版本号遵循语义化版本（SemVer）。
 
+## [1.1.1] - 2026-09-10
+
+### Changed / 变更
+
+- README consistency unification across the three sibling repositories (`raindrop-bookmark-organizer`, `eagle-untagged-organizer`, `eagle-tag-governance`): the Install table now uses the shared two-column layout (user-level + project-level) with the fixed agent row order, and Codex CLI's user-level directory is corrected from `~/.codex/skills/` to `~/.agents/skills/` (the cross-agent directory the other two repositories document); the `~/.agents/skills/` interop tip is aligned with the other READMEs; the clone example targets `~/.agents/skills/`; the intro now says "Agent Skills-compatible" and links `https://agentskills.io` (was the invalid `agentskills.my`), and "Copilot" is written in full as "GitHub Copilot".
+  三仓库（`raindrop-bookmark-organizer`、`eagle-untagged-organizer`、`eagle-tag-governance`）README 一致性统一：安装表改为通用双列布局（用户级 + 项目级），Agent 行序固定；Codex CLI 用户级目录由 `~/.codex/skills/` 修正为 `~/.agents/skills/`（另两仓记载的跨平台通用目录）；`~/.agents/skills/` 互操作提示与另两仓对齐；clone 示例指向 `~/.agents/skills/`；开篇改为 "Agent Skills-compatible" 定位并修正链接（原 `agentskills.my` 为无效地址）；"Copilot" 统一写全称 "GitHub Copilot"。
+
+### Notes / 说明
+
+- Version bumped 1.1.0 → 1.1.1 (PATCH: documentation only); no workflow or write-behavior changes.
+  版本 1.1.0 → 1.1.1（PATCH：纯文档）；工作流与写入行为无任何变化。
+
 ## [1.1.0] - 2026-09-10
 
 ### Added / 新增

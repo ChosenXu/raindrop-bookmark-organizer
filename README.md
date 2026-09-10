@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-A cross-platform [Agent Skill](https://agentskills.my/) that batch-organizes a [Raindrop.io](https://raindrop.io/) library with a proven three-step workflow — **name (optional) → annotate → tag**. Works in any agent that reads the SKILL.md standard (Claude Code, Codex CLI, Gemini CLI, Copilot, Cursor, WorkBuddy…). Battle-tested end-to-end on a real 1,101-bookmark library: 37 batches, 100% tagged + annotated, zero structural violations.
+An [Agent Skills](https://agentskills.io)-compatible skill that batch-organizes a [Raindrop.io](https://raindrop.io/) library with a proven three-step workflow — **name (optional) → annotate → tag**. Works in any agent that reads the Agent Skills standard (Claude Code, Codex CLI, Gemini CLI, GitHub Copilot, Cursor, WorkBuddy…). Battle-tested end-to-end on a real 1,101-bookmark library: 37 batches, 100% tagged + annotated, zero structural violations.
 
 ## What it does
 
@@ -32,21 +32,23 @@ Tag output language is configurable: the skeleton ships with Simplified Chinese 
 
 Clone this repository into your agent's skills directory:
 
+| Agent | User-level directory | Project-level directory |
+|---|---|---|
+| Claude Code | `~/.claude/skills/` | `.claude/skills/` |
+| Codex CLI | `~/.agents/skills/` | `.agents/skills/` |
+| Gemini CLI | `~/.gemini/skills/` | `.gemini/skills/` |
+| GitHub Copilot | `~/.copilot/skills/` | `.github/skills/` |
+| Cursor | `~/.cursor/skills/` | `.cursor/skills/` |
+| WorkBuddy | `~/.workbuddy/skills/` | — |
+
+Tip: `~/.agents/skills/` is the cross-agent directory — Codex CLI, Gemini CLI, GitHub Copilot, and Cursor read it natively, and Claude Code scans it as a fallback too. One install, discovered by multiple agents.
+
 ```bash
 git clone https://github.com/ChosenXu/raindrop-bookmark-organizer.git \
-  <skills-dir>/raindrop-bookmark-organizer
+  ~/.agents/skills/raindrop-bookmark-organizer
 ```
 
-| Agent | Skills directory |
-|---|---|
-| Claude Code | `~/.claude/skills/` (personal) or `.claude/skills/` (project) |
-| Codex CLI | `~/.codex/skills/` |
-| Gemini CLI | `~/.gemini/skills/` |
-| GitHub Copilot | `.github/skills/` |
-| Cursor | `.cursor/skills/` (project scope) |
-| WorkBuddy | `~/.workbuddy/skills/` |
-
-> `.agents/skills/` works as a universal fallback directory for most agents.
+Or copy the folder manually into any of the directories above.
 
 ## Prerequisites
 

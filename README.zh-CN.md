@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-一个跨平台的 [Agent Skill](https://agentskills.my/)，用经过实战验证的三步工作流批量整理 [Raindrop.io](https://raindrop.io/) 书签库——**命名（可选）→ 写描述 → 打标签**。可在任何支持 SKILL.md 标准的 Agent 中使用（Claude Code、Codex CLI、Gemini CLI、Copilot、Cursor、WorkBuddy…）。已在真实的 1101 条书签库上端到端跑通：37 个批次，100% 打标 + 写描述，零结构违规。
+一个符合 [Agent Skills](https://agentskills.io) 开放标准的 Skill，用经过实战验证的三步工作流批量整理 [Raindrop.io](https://raindrop.io/) 书签库——**命名（可选）→ 写描述 → 打标签**。可在任何支持 Agent Skills 标准的 Agent 中使用（Claude Code、Codex CLI、Gemini CLI、GitHub Copilot、Cursor、WorkBuddy…）。已在真实的 1101 条书签库上端到端跑通：37 个批次，100% 打标 + 写描述，零结构违规。
 
 ## 它能做什么
 
@@ -30,21 +30,23 @@
 
 将本仓库克隆到你所用 Agent 的 skills 目录：
 
+| Agent | 用户级目录 | 项目级目录 |
+|---|---|---|
+| Claude Code | `~/.claude/skills/` | `.claude/skills/` |
+| Codex CLI | `~/.agents/skills/` | `.agents/skills/` |
+| Gemini CLI | `~/.gemini/skills/` | `.gemini/skills/` |
+| GitHub Copilot | `~/.copilot/skills/` | `.github/skills/` |
+| Cursor | `~/.cursor/skills/` | `.cursor/skills/` |
+| WorkBuddy | `~/.workbuddy/skills/` | — |
+
+提示：`~/.agents/skills/` 是跨平台通用目录——Codex CLI、Gemini CLI、GitHub Copilot 与 Cursor 均原生读取，Claude Code 也会作为兜底路径扫描。一处安装，多平台发现。
+
 ```bash
 git clone https://github.com/ChosenXu/raindrop-bookmark-organizer.git \
-  <skills-dir>/raindrop-bookmark-organizer
+  ~/.agents/skills/raindrop-bookmark-organizer
 ```
 
-| Agent | skills 目录 |
-|---|---|
-| Claude Code | `~/.claude/skills/`（个人级）或 `.claude/skills/`（项目级） |
-| Codex CLI | `~/.codex/skills/` |
-| Gemini CLI | `~/.gemini/skills/` |
-| GitHub Copilot | `.github/skills/` |
-| Cursor | `.cursor/skills/`（仅项目级） |
-| WorkBuddy | `~/.workbuddy/skills/` |
-
-> `.agents/skills/` 可作为大多数 Agent 的通用回退目录。
+或手动将文件夹复制到上表任意目录。
 
 ## 前置条件
 

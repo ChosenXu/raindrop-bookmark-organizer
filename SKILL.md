@@ -2,7 +2,7 @@
 name: raindrop-bookmark-organizer
 description: Use when the user wants to organize, tag, annotate, or rename bookmarks in their Raindrop.io library (via the Raindrop REST API and an optional Raindrop MCP server). Triggers on mentions of Raindrop, raindrop.io, 书签, bookmarks, 收藏 combined with a batch-organize intent (打标签 / 写描述 / 整理 / tag / annotate / organize). Produces a structured note and three-axis controlled tags for each bookmark; title rewriting is a conservative opt-in step. Supports checkpointed batch processing across sessions for libraries of 1000+ bookmarks.
 agent_created: true
-version: 1.1.0
+version: 1.1.1
 license: MIT
 ---
 
