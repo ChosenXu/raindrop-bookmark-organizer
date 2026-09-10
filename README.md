@@ -1,21 +1,23 @@
 # Raindrop Bookmark Organizer
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+[English](README.md) | [Simplified Chinese](README.zh-CN.md)
 
-A [WorkBuddy](https://www.workbuddy.cn/) skill that batch-organizes a [Raindrop.io](https://raindrop.io/) library with a proven three-step workflow — **命名（可选）→ 写描述 → 打标签**. Battle-tested end-to-end on a real 1,101-bookmark library: 37 batches, 100% tagged + annotated, zero structural violations.
+A [WorkBuddy](https://www.workbuddy.cn/) skill that batch-organizes a [Raindrop.io](https://raindrop.io/) library with a proven three-step workflow — **name (optional) → annotate → tag**. Battle-tested end-to-end on a real 1,101-bookmark library: 37 batches, 100% tagged + annotated, zero structural violations.
 
 ## What it does
 
 For every untagged bookmark it produces:
 
-1. **Note** — 1–2 sentences: what it is + when you'll reach for it (40–80 字中文 / 30–60 words English)
+1. **Note** — 1–2 sentences: what it is + when you'll reach for it (40–80 characters in Chinese, 30–60 words in English)
 2. **Tags** — up to 6, selected verbatim from a controlled three-axis vocabulary:
-   - **Domain** (1–2): 10 categories ≈ 37 leaves — 开发 / 设计 / AI / 产品效率 / 数码硬件 / 影音文化 / 阅读学习 / 科学 / 资讯 / 实用工具
-   - **Type** (exactly 1): 16 types in 5 semantic groups — 资产 / 交互 / 内容 / 检索 / 身份
-   - **Status** (0–2, off by default): 待读 · 精华 · 免费 · 开源 · 付费 · 中文 · 英文
+   - **Domain** (1–2): 10 categories ≈ 37 leaves — Dev / Design / AI / Productivity / Hardware / Media & Culture / Learning / Science / News / Utilities
+   - **Type** (exactly 1): 16 types in 5 semantic groups — Assets / Interactive / Content / Discovery / Identity
+   - **Status** (0–2, off by default): to-read · starred · free · oss · paid · zh · en
 3. **Title rewrite** — conservative, opt-in, default OFF; garbage titles only
 
 Design principle: **metadata first**. Raindrop's list API returns title/link/domain/excerpt in bulk — no webpage fetching needed for ~90% of bookmarks. Deep-fetch (`fetch_bookmark_content`) is reserved for the low-confidence subset.
+
+Tag output language is configurable: the skeleton ships with Simplified Chinese and English canonical columns, and the custom vocabulary file can rename any tag or switch the tag language per library.
 
 ## Highlights
 
@@ -44,7 +46,7 @@ Or copy the folder manually into `~/.workbuddy/skills/`.
 
 ## Usage
 
-Mention Raindrop / 书签 with an intent like "帮我整理 Raindrop 书签" / "organize my raindrop bookmarks", and the skill drives the workflow. See [`SKILL.md`](SKILL.md) for the full workflow (pull → classify → plan → apply → verify).
+Mention Raindrop with an intent like "organize my Raindrop bookmarks" or "tidy up my bookmark library" (Chinese trigger phrases work as well), and the skill drives the workflow. See [`SKILL.md`](SKILL.md) for the full workflow (pull → classify → plan → apply → verify).
 
 The batch engine is also usable standalone:
 
@@ -62,15 +64,15 @@ Optionally copy `references/vocabulary.custom.example.md` → `vocabulary.custom
 
 - MCP `update_bookmarks` tags object = incremental `{add, remove}` delta; REST `PUT /raindrop/{id}` tags array = full assignment. Bulk tagging → REST.
 - `delete_tags` lies about success (`deleted:N` on nonexistent tags) — every destructive op needs readback verification.
-- "Downloadable" ≠ "asset": book/manga libraries and mirror services are NOT `素材库` (they're content platforms / infrastructure). The vocabulary ships with an exclusion list.
-- `待读` (to-read) applies to single articles only (the `type=article` signal), never site-level bookmarks.
+- "Downloadable" ≠ "asset": book/manga libraries and mirror services are NOT tagged `asset-library` (they're content platforms / infrastructure). The vocabulary ships with an exclusion list.
+- The `to-read` status applies to single articles only (the `type=article` signal), never site-level bookmarks.
 - Frozen vocabulary ≠ frozen data: after any vocabulary revision, re-validate all pending class records before applying.
 
 ## Structure
 
 ```
 SKILL.md                            # skill definition & workflow
-README.md / README.zh-CN.md         # this file (EN / 简体中文)
+README.md / README.zh-CN.md         # this file (English / Simplified Chinese)
 CHANGELOG.md                        # bilingual changelog
 LICENSE                             # MIT
 docs/
