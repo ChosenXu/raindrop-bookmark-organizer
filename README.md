@@ -1,67 +1,88 @@
-# raindrop-bookmark-organizer
+# Raindrop Bookmark Organizer
 
-[WorkBuddy](https://www.workbuddy.cn) skill that batch-organizes a Raindrop.io library with a proven three-step workflow: **命名（可选）→ 写描述 → 打标签**.
+[English](README.md) | [简体中文](README.zh-CN.md)
 
-Battle-tested on a real 1,101-bookmark library — 37 batches, zero structural violations, every write verified by readback.
+A [WorkBuddy](https://www.workbuddy.cn/) skill that batch-organizes a [Raindrop.io](https://raindrop.io/) library with a proven three-step workflow — **命名（可选）→ 写描述 → 打标签**. Battle-tested end-to-end on a real 1,101-bookmark library: 37 batches, 100% tagged + annotated, zero structural violations.
 
 ## What it does
 
 For every untagged bookmark it produces:
 
-- **Note** — 1–2 sentences: what it is + when you'll reach for it (40–80 字中文 / 30–60 words English)
-- **Tags** — up to 6, from a controlled three-axis vocabulary:
-  - **Domain** (1–2): 10 categories ≈ 37 leaves — 开发 / 设计 / AI / 产品效率 / 数码硬件 / 影音文化 / 阅读学习 / 科学 / 资讯 / 实用工具
-  - **Type** (exactly 1): 16 types in 5 groups — 资产 / 交互 / 内容 / 检索 / 身份
-  - **Status** (0–2, off by default): 待读 · 精华 · 免费 · 开源 · 付费 · 中文 · 英文
-- **Title rewrite** — conservative, opt-in, default OFF; garbage titles only
+1. **Note** — 1–2 sentences: what it is + when you'll reach for it (40–80 字中文 / 30–60 words English)
+2. **Tags** — up to 6, selected verbatim from a controlled three-axis vocabulary:
+   - **Domain** (1–2): 10 categories ≈ 37 leaves — 开发 / 设计 / AI / 产品效率 / 数码硬件 / 影音文化 / 阅读学习 / 科学 / 资讯 / 实用工具
+   - **Type** (exactly 1): 16 types in 5 semantic groups — 资产 / 交互 / 内容 / 检索 / 身份
+   - **Status** (0–2, off by default): 待读 · 精华 · 免费 · 开源 · 付费 · 中文 · 英文
+3. **Title rewrite** — conservative, opt-in, default OFF; garbage titles only
 
-Design principle: **metadata first**. Raindrop's list API returns title/link/domain/excerpt in bulk — no webpage fetching needed for ~90% of bookmarks. Deep-fetch is reserved for the low-confidence subset.
+Design principle: **metadata first**. Raindrop's list API returns title/link/domain/excerpt in bulk — no webpage fetching needed for ~90% of bookmarks. Deep-fetch (`fetch_bookmark_content`) is reserved for the low-confidence subset.
 
-## Quick start
+## Highlights
 
-1. Get an API token: [app.raindrop.io/settings/integrations](https://app.raindrop.io/settings/integrations) → **For Developers** → Test tokens
-2. Export it: `export RD_API_TOKEN=<your-token>` (never commit it anywhere)
-3. In WorkBuddy, just ask: *"帮我整理 Raindrop 书签"* or *"organize my raindrop bookmarks"*
+1. **Metadata first, fetch only when unsure** — bulk list API returns title/link/domain/excerpt/type per bookmark; webpage fetching is a tier-2 fallback for the low-confidence subset, not the default path.
+2. **Structured, reusable, and on-track** — tags are selected verbatim from a controlled two-layer vocabulary (universal skeleton + optional personal extension), with mutual-exclusion rules and boundary cases written down. The result is a consistent library whose tag taxonomy never drifts out of control.
+3. **Safety first: preview before writing** — every batch is surfaced as a Before/After plan for review; before any write, one command snapshots every bookmark's current note/tags to an undo file; after writing, each item is read back and verified — it never silently mutates your library.
+4. **Scales to large libraries** — checkpointed batches with a worklog state machine, resumable across sessions; 1,100+ bookmarks were processed this way without a single duplicate write.
+5. **Idempotent and retry-hardened** — re-running `apply` only picks up unprocessed records; transient network/SSL failures are retried with exponential backoff (survived real outages mid-run).
+6. **Honest about limits** — free Raindrop plans have no semantic search; pure JS-rendered sites may yield no parseable content; title rewriting stays opt-in because original titles often carry valid information.
 
-Optionally copy `references/vocabulary.custom.example.md` → `vocabulary.custom.md` to rename tags, add private domains, or enable the status axis.
+## Install
 
-## How a full-library run works
-
-1. **pull** — sample untagged bookmarks (worklog-aware, resumable across sessions)
-2. **classify** — structured records: `domain_tags` / `type` / `status` / `free` (roles are explicit, so leaf/type homonyms like 字体 never get confused)
-3. **plan** — Before/After table for review, zero writes
-4. **apply** — undo snapshot → conflict guard (skips already-tagged) → batches of 10 → readback verification → worklog advances (`applied` / `unverified` / `conflict-skip`)
+Clone this repository into your WorkBuddy skills directory:
 
 ```bash
-python scripts/organize.py pull --sample 30     # fetch next batch
-python scripts/organize.py plan --class <file>  # render review plan (no writes)
-python scripts/organize.py apply --class <file> # verified write-back
-python scripts/organize.py stats                # library progress
-python scripts/rd_client.py --smoke             # client self-test with scratch data
+git clone https://github.com/ChosenXu/raindrop-bookmark-organizer.git \
+  ~/.workbuddy/skills/raindrop-bookmark-organizer
 ```
 
-## Safety model
+Or copy the folder manually into `~/.workbuddy/skills/`.
 
-- **Undo snapshot** before every write batch (`apply-*.undo.json`, stored outside the repo)
-- **Readback verification** — the `deleted`/`updated` counts alone are never trusted (Raindrop's `delete_tags` lies about success; confirmed by probe)
-- **Conflict guard** — bookmarks that already have tags are skipped, never overwritten
-- **Idempotent** — re-running `apply` only picks up unprocessed records; safe after crashes (survived real SSL-flap outages)
-- **Network retry** — 4 attempts with exponential backoff on transient failures
+## Prerequisites
+
+- A Raindrop.io API token (free plan works): [app.raindrop.io/settings/integrations](https://app.raindrop.io/settings/integrations) → **For Developers** → Test tokens
+- Export it before running: `export RD_API_TOKEN=<your-token>` — never commit it anywhere
+
+## Usage
+
+Mention Raindrop / 书签 with an intent like "帮我整理 Raindrop 书签" / "organize my raindrop bookmarks", and the skill drives the workflow. See [`SKILL.md`](SKILL.md) for the full workflow (pull → classify → plan → apply → verify).
+
+The batch engine is also usable standalone:
+
+```bash
+python scripts/organize.py pull --sample 30      # fetch next untagged batch
+python scripts/organize.py plan --class <file>   # render Before/After plan (no writes)
+python scripts/organize.py apply --class <file>  # verified write-back with undo snapshot
+python scripts/organize.py stats                 # library progress
+python scripts/rd_client.py --smoke              # client self-test with scratch data
+```
+
+Optionally copy `references/vocabulary.custom.example.md` → `vocabulary.custom.md` to rename tags, add private domains, or enable the status axis — no custom file needed to get started.
 
 ## Field notes (learned the hard way)
 
 - MCP `update_bookmarks` tags object = incremental `{add, remove}` delta; REST `PUT /raindrop/{id}` tags array = full assignment. Bulk tagging → REST.
-- Free Raindrop plans cannot use MCP semantic `search` — structural filters only.
+- `delete_tags` lies about success (`deleted:N` on nonexistent tags) — every destructive op needs readback verification.
 - "Downloadable" ≠ "asset": book/manga libraries and mirror services are NOT `素材库` (they're content platforms / infrastructure). The vocabulary ships with an exclusion list.
-- `待读` (to-read) applies to single articles only (`type=article` signal), never site-level bookmarks.
+- `待读` (to-read) applies to single articles only (the `type=article` signal), never site-level bookmarks.
 - Frozen vocabulary ≠ frozen data: after any vocabulary revision, re-validate all pending class records before applying.
 
-## Requirements
+## Structure
 
-- Python 3.10+ (stdlib only, no dependencies)
-- A Raindrop.io API token (free plan works)
-- WorkBuddy (for the skill workflow) — or use `scripts/` standalone
+```
+SKILL.md                            # skill definition & workflow
+README.md / README.zh-CN.md         # this file (EN / 简体中文)
+CHANGELOG.md                        # bilingual changelog
+LICENSE                             # MIT
+docs/
+  decisions.md                      # architecture decisions & rationale
+references/
+  vocabulary.md                     # universal three-axis skeleton (zh/en, normative)
+  vocabulary.custom.example.md      # template for the personal extension layer
+scripts/
+  rd_client.py                      # REST client: bulk reads, verified writes, self-test
+  organize.py                       # batch engine: pull / plan / apply / stats
+```
 
 ## License
 
-MIT
+[MIT](LICENSE)
