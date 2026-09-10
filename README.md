@@ -1,6 +1,6 @@
 # Raindrop Bookmark Organizer
 
-[English](README.md) | [Simplified Chinese](README.zh-CN.md)
+English | [简体中文](README.zh-CN.md)
 
 A [WorkBuddy](https://www.workbuddy.cn/) skill that batch-organizes a [Raindrop.io](https://raindrop.io/) library with a proven three-step workflow — **name (optional) → annotate → tag**. Battle-tested end-to-end on a real 1,101-bookmark library: 37 batches, 100% tagged + annotated, zero structural violations.
 
@@ -72,7 +72,7 @@ Optionally copy `references/vocabulary.custom.example.md` → `vocabulary.custom
 
 ```
 SKILL.md                            # skill definition & workflow
-README.md / README.zh-CN.md         # this file (English / Simplified Chinese)
+README.md / README.zh-CN.md         # this file (English / 简体中文)
 CHANGELOG.md                        # bilingual changelog
 LICENSE                             # MIT
 docs/
