@@ -96,6 +96,10 @@ scripts/
   organize.py                       # batch engine: pull / plan / apply / stats
 ```
 
+## Related skills
+
+- [raindrop-collection-governance](https://github.com/ChosenXu/raindrop-collection-governance) — governs *where bookmarks live*: collection-structure audits, user-confirmed restructuring, and misplaced-bookmark relocation. Paired with this skill (which owns *what bookmarks look like*: notes and tags), the two cover the full library-governance loop.
+
 ## License
 
 [MIT](LICENSE)

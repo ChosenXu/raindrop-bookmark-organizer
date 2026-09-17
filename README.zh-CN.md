@@ -94,6 +94,10 @@ scripts/
   organize.py                       # 批处理引擎：pull / plan / apply / stats
 ```
 
+## 相关 skill
+
+- [raindrop-collection-governance](https://github.com/ChosenXu/raindrop-collection-governance)——治理书签「住在哪里」：收藏夹结构盘点、经确认的重组、放错书签归位。与本 skill（管书签「长什么样」：描述与标签）搭配使用，覆盖收藏库治理的完整闭环。
+
 ## 许可证
 
 [MIT](LICENSE)
