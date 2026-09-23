@@ -81,6 +81,8 @@ class RaindropClient:
         return r["user"]
 
     def list_page(self, collection_id: int = 0, page: int = 0, perpage: int = 50) -> dict:
+        if not isinstance(collection_id, int):
+            raise RaindropError(f"invalid collection id: {collection_id!r}")
         return self._request(
             "GET", f"/raindrops/{collection_id}?perpage={perpage}&page={page}"
         )
@@ -99,6 +101,8 @@ class RaindropClient:
             page += 1
 
     def get(self, raindrop_id: int) -> dict | None:
+        if not isinstance(raindrop_id, int):
+            raise RaindropError(f"invalid raindrop id: {raindrop_id!r}")
         r = self._request("GET", f"/raindrop/{raindrop_id}")
         return r.get("item") if r.get("result") else None
 
@@ -111,6 +115,8 @@ class RaindropClient:
         title: str | None = None,
     ) -> dict:
         """Single-field-group update. Returns {'applied': bool, 'item': readback}."""
+        if not isinstance(raindrop_id, int):
+            raise RaindropError(f"invalid raindrop id: {raindrop_id!r}")
         payload: dict = {}
         if note is not None:
             payload["note"] = note
@@ -118,7 +124,10 @@ class RaindropClient:
             payload["tags"] = tags
         if title is not None:
             payload["title"] = title
-        r = self._request("PUT", f"/raindrop/{raindrop_id}", payload or {})
+        if not payload:
+            raise RaindropError(
+                "update() refused: note/tags/title are all None (nothing to write)")
+        r = self._request("PUT", f"/raindrop/{raindrop_id}", payload)
         if not r.get("result"):
             return {"applied": False, "item": None}
         item = self.get(raindrop_id)
@@ -137,6 +146,8 @@ class RaindropClient:
         return (r.get("item") or {}).get("_id")
 
     def delete_collection(self, collection_id: int) -> bool:
+        if not isinstance(collection_id, int):
+            raise RaindropError(f"invalid collection id: {collection_id!r}")
         r = self._request("DELETE", f"/collection/{collection_id}")
         return bool(r.get("result"))
 

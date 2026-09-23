@@ -6,6 +6,26 @@ All notable changes to this skill are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 格式参考 Keep a Changelog，版本号遵循语义化版本（SemVer）。
 
+## [1.1.3] - 2026-09-23
+
+### Fixed / 修复
+
+- `apply --what` values are now validated up front: unknown or empty values (e.g. `--what tag`) exit with an error before any API call, instead of silently sending an empty PUT and recording a false `applied` status in the worklog for bookmarks that were never written.
+  `apply --what` 取值改为入口处校验：未知或空值（如 `--what tag`）在发出任何 API 请求前即报错退出，不再静默发送空 PUT、把从未写入的书签以假 `applied` 状态记进 worklog。
+- Bookmark ids from the class file are coerced to integers and non-int ids are skipped (`invalid-skip`); `rd_client` read/write methods (`get`/`update`/`list_page`/`delete_collection`) now reject non-integer ids before URL interpolation. This closes the API path-injection surface where a crafted class file (e.g. a string id like `"123/.."`) could steer requests to arbitrary endpoints. Resume matching now prefers the int-normalized worklog key, so records keyed by a string id are correctly recognized as done and unparseable ids become terminal instead of re-reporting on every run.
+  class 文件中的书签 id 强制转为整数，非整数 id 直接跳过（`invalid-skip`）；`rd_client` 的读写方法（`get`/`update`/`list_page`/`delete_collection`）在拼接 URL 前拒绝非整数 id。由此封堵 API 路径注入面——被构造的 class 文件（如字符串 id `"123/.."`）原本可能把请求导向任意端点。断点续跑匹配改为优先整数化的 worklog 键：字符串 id 的记录能被正确识别为已完成，无法解析的 id 成为终态，不再每次重跑都重复报 skip。
+- `apply` now re-runs `validate()` on every record before writing (previously only `plan` validated): records edited after the plan step can no longer bypass the controlled-vocabulary rules (tag cap, mutual exclusion, domain membership) and write illegal tags directly into the library.
+  `apply` 写入前对每条记录复跑 `validate()`（原先仅 `plan` 校验）：plan 之后被再编辑的 class 文件再也无法绕过受控词表规则（标签上限、互斥、领域成员资格）把非法标签直写进库。
+- The undo snapshot is now flushed to disk BEFORE every single write instead of every 10 items: an interrupted run (Ctrl-C, kill) can no longer leave the most recent ≤9 written bookmarks without rollback data.
+  undo 快照改为每条写入**之前**即落盘（原先每 10 条才落盘一次）：中断的执行（Ctrl-C、kill）不会再让最近 ≤9 条已写入的书签失去回滚数据。
+- `rd_client.update()` refuses to send an update when all fields are None (empty-payload guard), and `flatten()` degrades safely on malformed input (non-list `proposed_tags`, non-string `type`) so `validate()` can flag the record instead of crashing.
+  `rd_client.update()` 在三个字段全为 None 时拒绝发送更新（空载荷防护）；`flatten()` 对畸形输入（`proposed_tags` 非列表、`type` 非字符串）安全降级，让 `validate()` 能标红该记录而不是直接崩溃。
+
+### Notes / 说明
+
+- Security review follow-up (4 medium findings fixed; report of 2026-09-22). New worklog state `invalid-skip` is terminal, like `conflict-skip`: reclassify the item and re-run the plan→apply cycle. No workflow changes for valid inputs.
+  系安全审查跟进（修复 4 项中危发现；审查报告 2026-09-22）。新增 worklog 状态 `invalid-skip` 与 `conflict-skip` 一样为终态：重新分类该条目并重跑 plan→apply 循环即可。对合法输入而言工作流无任何变化。
+
 ## [1.1.1] - 2026-09-10
 
 ### Changed / 变更

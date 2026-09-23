@@ -2,7 +2,7 @@
 name: raindrop-bookmark-organizer
 description: Use when the user wants to organize, tag, annotate, or rename bookmarks in their Raindrop.io library (via the Raindrop REST API and an optional Raindrop MCP server). Triggers on mentions of Raindrop, raindrop.io, 书签, bookmarks, 收藏 combined with a batch-organize intent (打标签 / 写描述 / 整理 / tag / annotate / organize). Produces a structured note and three-axis controlled tags for each bookmark; title rewriting is a conservative opt-in step. Supports checkpointed batch processing across sessions for libraries of 1000+ bookmarks.
 agent_created: true
-version: 1.1.2
+version: 1.1.3
 license: MIT
 ---
 
@@ -49,7 +49,8 @@ Free-plan constraint: MCP `search` parameters are Pro-only — never rely on the
 
 - `delete_tags` lies about success (it reports `deleted:N` even for tags that do not exist). Every delete is followed by readback verification; the `deleted` count alone is never trusted.
 - `delete_bookmarks` is soft-delete (moves to Trash). The skill never deletes bookmarks; it only adds metadata.
-- Before any write: snapshot original state (title/note/tags) into an undo mapping file.
+- Before any write: snapshot original state (title/note/tags) into an undo mapping file. The snapshot is flushed to disk before every single write, so an interrupted run never loses undo data.
+- `apply` re-validates every record against the vocabulary rules before writing (invalid records are skipped as `invalid-skip`), coerces ids to integers (path-safety), and rejects unknown `--what` values up front.
 - All reports go to `/tmp/`, never into the repo.
 
 ## Vocabulary & language

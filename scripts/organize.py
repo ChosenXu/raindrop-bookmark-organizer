@@ -45,7 +45,7 @@ WORKLOG = STATE_DIR / "worklog.jsonl"
 DEFAULT_OUT = STATE_DIR
 
 
-def log_state(rid: int, status: str) -> None:
+def log_state(rid: int | str, status: str) -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with open(WORKLOG, "a") as f:
         f.write(json.dumps({"id": rid, "status": status,
@@ -123,11 +123,13 @@ def flatten(rec: dict) -> dict:
         dom = list(rec.get("domain_tags") or [])
         st = list(rec.get("status") or [])
         free = list(rec.get("free") or [])
-        typ = rec["type"]
+        typ = rec["type"] if isinstance(rec["type"], str) else ""
         return {"domain": dom, "type": typ, "status": st, "free": free,
                 "tags": [*dom, typ, *st, *free]}
     # legacy flat: infer type = first tag belonging to a group
-    t = rec.get("proposed_tags", [])
+    t = rec.get("proposed_tags") or []
+    if not isinstance(t, list):
+        t = []
     typ = next((x for x in t if x in GROUPS), "")
     st = [x for x in t if x in {"待读", "精华", "免费", "开源", "付费", "中文", "英文"}]
     dom = [x for x in t if x != typ and x not in st and _is_domain(x)]
@@ -216,14 +218,40 @@ def cmd_plan(cls_path: Path, out: Path | None) -> int:
 def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
     """Write classified bookmarks back to Raindrop with verification.
 
-    Safety: pre-write undo snapshot per item; skip any bookmark that already
-    has tags (conflict guard); batches of 10; stop on first API failure;
-    worklog advances classified-dryrun -> applied / unverified / conflict-skip.
+    Safety: pre-write undo snapshot per item, flushed to disk BEFORE each
+    write; skip any bookmark that already has tags (conflict guard); every
+    record is re-validated (validate()) before writing; ids are coerced to
+    int (path-safety guard); batches of 10; stop on first API failure;
+    worklog advances classified-dryrun -> applied / unverified / conflict-skip
+    / invalid-skip.
     """
+    if not what or what - {"note", "tags"}:
+        print(f"invalid --what {sorted(what)}: allowed values are 'note', 'tags'",
+              file=sys.stderr)
+        return 2
     rc = RaindropClient()
     records = json.loads(cls_path.read_text())
     status = load_worklog()
-    pending = [r for r in records if status.get(r["id"]) == "classified-dryrun"]
+
+    def _is_pending(r: dict) -> bool:
+        """A record is pending only under a non-terminal status. The
+        int-normalized worklog key takes precedence (log_state always writes
+        the coerced id); the raw key is the fallback for unparseable ids
+        (logged verbatim as invalid-skip)."""
+        try:
+            rid_int = int(r["id"])
+        except (AttributeError, KeyError, TypeError, ValueError):
+            rid_int = None
+        if rid_int is not None:
+            s = status.get(rid_int)
+            if s is not None:
+                return s == "classified-dryrun"
+        try:
+            return status.get(r["id"]) == "classified-dryrun"
+        except (AttributeError, KeyError, TypeError):
+            return False  # non-dict record or unhashable id: never pending
+
+    pending = [r for r in records if _is_pending(r)]
     if limit:
         pending = pending[:limit]
     if not pending:
@@ -232,14 +260,28 @@ def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
     undo_path = STATE_DIR / f"apply-{time.strftime('%Y%m%d-%H%M%S')}.undo.json"
     print(f"applying {len(pending)} items (what={sorted(what)}), undo -> {undo_path}")
 
-    stats = {"requested": 0, "verified_ok": 0, "unverified": 0, "conflict_skip": 0}
+    stats = {"requested": 0, "verified_ok": 0, "unverified": 0,
+             "conflict_skip": 0, "invalid_skip": 0}
     snapshot: dict = {}
 
     def flush_undo():
         undo_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=1))
 
     for i, r in enumerate(pending, 1):
-        rid = r["id"]
+        try:
+            rid = int(r["id"])
+        except (KeyError, TypeError, ValueError):
+            print(f"skip {r.get('id')!r}: id is not an integer (path-safety guard)")
+            stats["invalid_skip"] += 1
+            if isinstance(r.get("id"), (int, str)):
+                log_state(r["id"], "invalid-skip")  # terminal: don't re-report
+            continue
+        v = validate(r)
+        if v:
+            print(f"skip {rid}: validation failed {v}")
+            stats["invalid_skip"] += 1
+            log_state(rid, "invalid-skip")
+            continue
         f = flatten(r)
         note = r.get("proposed_note") or r.get("note_draft") or ""
         try:
@@ -261,6 +303,7 @@ def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
         snapshot[str(rid)] = {"title": cur.get("title", ""),
                               "note": cur.get("note", ""),
                               "tags": cur.get("tags") or []}
+        flush_undo()  # persist undo state BEFORE the write (crash-safe)
         payload_note = note if "note" in what else None
         payload_tags = f["tags"] if "tags" in what else None
         try:
@@ -278,7 +321,6 @@ def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
             log_state(rid, "unverified")
             print(f"UNVERIFIED {rid}")
         if i % 10 == 0 or i == len(pending):
-            flush_undo()
             print(f"  progress {i}/{len(pending)}: {stats}")
     flush_undo()
     print(f"DONE {stats}")
