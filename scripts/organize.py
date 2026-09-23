@@ -45,23 +45,87 @@ WORKLOG = STATE_DIR / "worklog.jsonl"
 DEFAULT_OUT = STATE_DIR
 
 
+def _write_private(path: Path, text: str) -> None:
+    """Write a state file with owner-only permissions (0600), fsync'd —
+    state files carry full bookmark metadata and belong to the user alone.
+    fchmod heals legacy files created 0644 by earlier versions."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        os.fchmod(f.fileno(), 0o600)
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
+
+
 def log_state(rid: int | str, status: str) -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    with open(WORKLOG, "a") as f:
+    fd = os.open(WORKLOG, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, "a") as f:
+        os.fchmod(f.fileno(), 0o600)  # heal legacy 0644 worklogs
         f.write(json.dumps({"id": rid, "status": status,
                             "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
 
 
 def load_worklog() -> dict[int, str]:
-    """id -> latest status (applied / unverified / conflict-skip / classified-dryrun)."""
+    """id -> latest status (applied / unverified / conflict-skip / invalid-skip
+    / classified-dryrun). Corrupt lines (e.g. a torn append after a crash) are
+    skipped with a warning instead of breaking every subcommand."""
     if not WORKLOG.exists():
         return {}
     out: dict[int, str] = {}
-    for line in WORKLOG.read_text().splitlines():
-        if line.strip():
+    bad = 0
+    for lineno, line in enumerate(WORKLOG.read_text().splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
             e = json.loads(line)
             out[e["id"]] = e["status"]
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            bad += 1
+            print(f"warning: corrupt worklog line {lineno} skipped: {exc}",
+                  file=sys.stderr)
+    if bad:
+        print(f"warning: {bad} corrupt line(s) skipped in {WORKLOG}", file=sys.stderr)
     return out
+
+
+_ARTIFACT_MAX_AGE_DAYS = 30
+
+
+def prune_artifacts(max_age_days: int = _ARTIFACT_MAX_AGE_DAYS) -> list[str]:
+    """Delete regenerable review artifacts (sample-*.json, plan-*.md) older
+    than max_age_days. Undo snapshots and the worklog are NEVER touched."""
+    if not STATE_DIR.is_dir():
+        return []
+    cutoff = time.time() - max_age_days * 86400
+    removed: list[str] = []
+    for pat in ("sample-*.json", "plan-*.md"):
+        for p in STATE_DIR.glob(pat):
+            try:
+                if p.stat().st_mtime < cutoff:
+                    p.unlink()
+                    removed.append(p.name)
+            except OSError:
+                pass
+    return removed
+
+
+def _report_pruned() -> None:
+    removed = prune_artifacts()
+    if removed:
+        preview = ", ".join(removed[:5]) + (" ..." if len(removed) > 5 else "")
+        print(f"pruned {len(removed)} artifact(s) older than "
+              f"{_ARTIFACT_MAX_AGE_DAYS}d: {preview}")
+
+
+def _cell(s) -> str:
+    """Escape a value for a markdown table cell: strip newlines/tabs,
+    replace pipes — bookmark titles/notes must not inject rows or columns."""
+    return (str(s) if s is not None else "").replace("\r", " ").replace(
+        "\n", " ").replace("\t", " ").replace("|", "／")
 
 
 def pull_untagged(rc: RaindropClient) -> list[dict]:
@@ -86,9 +150,14 @@ def pull_untagged(rc: RaindropClient) -> list[dict]:
 
 
 def cmd_pull(sample: int, out: Path | None) -> int:
+    if sample < 1:
+        print(f"--sample must be >= 1 (got {sample})", file=sys.stderr)
+        return 2
     rc = RaindropClient()
+    _report_pruned()
     done = load_worklog()
     cands = [x for x in pull_untagged(rc) if x["id"] not in done]
+    rc.close()
     print(f"untagged candidates: {len(cands)} (worklog done: {len(done)})")
     if not cands:
         print("nothing to do")
@@ -97,8 +166,7 @@ def cmd_pull(sample: int, out: Path | None) -> int:
     stride = max(1, len(cands) // sample)
     sample_items = cands[::stride][:sample]
     out = out or (STATE_DIR / f"sample-{time.strftime('%Y%m%d-%H%M%S')}.json")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(sample_items, ensure_ascii=False, indent=1))
+    _write_private(out, json.dumps(sample_items, ensure_ascii=False, indent=1))
     print(f"sampled {len(sample_items)} -> {out}")
     for x in sample_items[:3]:
         print(f"  e.g. {x['id']} {x['title'][:40]} [{x['domain']}]")
@@ -147,9 +215,10 @@ def _is_domain(x: str) -> bool:
         "科研", "数学", "科技资讯", "设计资讯", "周刊日报", "查询计算", "安全隐私"}
 
 
-def validate(rec: dict) -> list[str]:
-    """Role-aware rule check. Returns list of issue strings (empty = pass)."""
-    f = flatten(rec)
+def validate(rec: dict, f: dict | None = None) -> list[str]:
+    """Role-aware rule check. Returns list of issue strings (empty = pass).
+    `f` may carry a pre-flattened record (see flatten) to avoid double work."""
+    f = f if f is not None else flatten(rec)
     issues = []
     if len(f["tags"]) > 6:
         issues.append("cap>6")
@@ -180,13 +249,15 @@ def cmd_plan(cls_path: Path, out: Path | None) -> int:
     """Render classification JSON into a review plan. Zero writes."""
     records = json.loads(cls_path.read_text())
     out = out or (STATE_DIR / f"plan-{time.strftime('%Y%m%d-%H%M%S')}.md")
-    out.parent.mkdir(parents=True, exist_ok=True)
     n_ok = sum(1 for r in records if r.get("tier") != "manual")
     by_tier: dict[str, int] = {}
     all_issues = {}
+    flattened = {}  # single flatten pass shared by validation + rendering
     for r in records:
         by_tier[r.get("tier", "?")] = by_tier.get(r.get("tier", "?"), 0) + 1
-        v = validate(r)
+        f = flatten(r)
+        flattened[r.get("id")] = f
+        v = validate(r, f)
         if v:
             all_issues[r["id"]] = v
     lines = [
@@ -198,18 +269,19 @@ def cmd_plan(cls_path: Path, out: Path | None) -> int:
         "|---|---|---|---|---|---|---|",
     ]
     for r in records:
-        f = flatten(r)
-        t = (r.get("proposed_note") or r.get("note_draft") or "").replace("|", "／")
-        tags = ", ".join(f["tags"])
-        title = (r.get("title") or "")[:36]
+        f = flattened.get(r.get("id")) or flatten(r)
+        t = _cell(r.get("proposed_note") or r.get("note_draft") or "")
+        tags = _cell(", ".join(str(x) for x in f["tags"]))
+        title = _cell((r.get("title") or ""))[:36]
         lines.append(
-            f"| {r['id']} | {title} | {r.get('domain','')[:24]} "
-            f"| {t} | {tags} | {r.get('confidence','')} | {r.get('tier','')} |")
+            f"| {_cell(r['id'])} | {title} | {_cell(r.get('domain',''))[:24]} "
+            f"| {t} | {tags} | {_cell(r.get('confidence',''))} | {_cell(r.get('tier',''))} |")
     manual = [r for r in records if r.get("tier") == "manual"]
     if manual:
         lines += ["", "## Manual list (needs human decision)", ""]
-        lines += [f"- {r['id']} {r.get('title','')[:60]} — {r.get('reason','')}" for r in manual]
-    out.write_text("\n".join(lines) + "\n")
+        lines += [f"- {_cell(r['id'])} {_cell(r.get('title',''))[:60]} — {_cell(r.get('reason',''))}"
+                  for r in manual]
+    _write_private(out, "\n".join(lines) + "\n")
     print(f"plan -> {out} ({len(records)} items, tiers={by_tier}, "
           f"validation={'ALL PASS' if not all_issues else all_issues})")
     return 0
@@ -224,10 +296,18 @@ def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
     int (path-safety guard); batches of 10; stop on first API failure;
     worklog advances classified-dryrun -> applied / unverified / conflict-skip
     / invalid-skip.
+
+    Known limitation (TOCTOU): the conflict guard is a pre-write GET; tags
+    added by another client between the check and the PUT would be replaced.
+    Raindrop has no conditional-update primitive, so this window cannot be
+    closed — run apply while no other client is writing.
     """
     if not what or what - {"note", "tags"}:
         print(f"invalid --what {sorted(what)}: allowed values are 'note', 'tags'",
               file=sys.stderr)
+        return 2
+    if limit < 0:
+        print(f"--limit must be >= 0 (got {limit})", file=sys.stderr)
         return 2
     rc = RaindropClient()
     records = json.loads(cls_path.read_text())
@@ -265,7 +345,8 @@ def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
     snapshot: dict = {}
 
     def flush_undo():
-        undo_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=1))
+        _write_private(undo_path,
+                       json.dumps(snapshot, ensure_ascii=False, indent=1))
 
     for i, r in enumerate(pending, 1):
         try:
@@ -289,6 +370,7 @@ def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
         except RaindropError as e:
             print(f"STOP at item {i} ({rid}): {e}")
             flush_undo()
+            rc.close()
             return 1
         if cur is None:
             print(f"skip {rid}: not found")
@@ -311,6 +393,7 @@ def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
         except RaindropError as e:
             print(f"STOP at item {i} ({rid}): {e}")
             flush_undo()
+            rc.close()
             return 1
         stats["requested"] += 1
         if res.get("applied"):
@@ -323,13 +406,16 @@ def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
         if i % 10 == 0 or i == len(pending):
             print(f"  progress {i}/{len(pending)}: {stats}")
     flush_undo()
+    rc.close()
     print(f"DONE {stats}")
     return 0 if stats["unverified"] == 0 else 1
 
 
 def cmd_stats() -> int:
     rc = RaindropClient()
+    _report_pruned()
     items = rc.list_all(0)
+    rc.close()
     total = len(items)
     tagged = sum(1 for x in items if x.get("tags"))
     noted = sum(1 for x in items if (x.get("note") or "").strip())

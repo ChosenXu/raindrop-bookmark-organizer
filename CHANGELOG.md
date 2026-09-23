@@ -6,6 +6,37 @@ All notable changes to this skill are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 格式参考 Keep a Changelog，版本号遵循语义化版本（SemVer）。
 
+## [1.2.0] - 2026-09-23
+
+### Added / 新增
+
+- Rate-limit resilience in `rd_client`: HTTP 429 responses are now retried with exponential backoff (honoring the `Retry-After` header when present) instead of aborting immediately, and the inter-request pacing adapts upward after a 429 so subsequent calls slow down automatically.
+  `rd_client` 的限流韧性：HTTP 429 响应改为指数退避重试（有 `Retry-After` 头时遵循之），不再立即中止；且 429 之后请求间隔自动调大，后续调用随之减速。
+- Connection reuse: the REST client keeps one persistent HTTPS connection per run (`http.client`), so a full-library pagination no longer pays a TCP+TLS handshake per request. Stale/broken connections are rebuilt transparently and retried.
+  连接复用：REST 客户端每次运行维持一条 HTTPS 长连接（`http.client`），全库分页拉取不再为每个请求付出 TCP+TLS 握手开销；失效连接透明重建并重试。
+
+### Changed / 变更
+
+- State files (`sample-*.json`, `plan-*.md`, undo snapshots, `worklog.jsonl`) are now created with owner-only permissions (0600) and fsync'd on write — they carry full bookmark metadata and are no longer readable by other local users under a permissive umask. Existing files created 0644 by earlier versions are healed to 0600 automatically on the next write.
+  状态文件（`sample-*.json`、`plan-*.md`、undo 快照、`worklog.jsonl`）改为属主专属权限（0600）创建并强制 fsync——这些文件含全量书签元数据，不再因宽松 umask 而被本机其他用户读取。旧版本创建的 0644 文件会在下次写入时自动愈合为 0600。
+- A torn/corrupt worklog line (e.g. after a crash mid-append) is skipped with a warning instead of crashing every subcommand (`pull`/`apply`/`stats`).
+  崩溃导致的半行/损坏 worklog 记录改为警告并跳过，不再让所有子命令（`pull`/`apply`/`stats`）集体崩溃。
+- Markdown plan tables escape newlines, tabs and pipes in every cell (title, note, tags, tier…), so a bookmark title can no longer inject rows or columns into the review plan.
+  Markdown 计划表的所有单元格（标题、备注、标签、层级……）统一转义换行、制表符与竖线，书签标题再也无法向审阅计划注入行或列。
+- `apply --limit` and `pull --sample` validate their values up front (`--limit >= 0`, `--sample >= 1`); `--sample 0` no longer crashes with ZeroDivisionError and a negative limit no longer silently truncates from the tail.
+  `apply --limit` 与 `pull --sample` 改为入口校验（`--limit >= 0`、`--sample >= 1`）；`--sample 0` 不再触发除零崩溃，负 limit 不再静默从尾部截断。
+- Regenerable review artifacts (`sample-*.json`, `plan-*.md`) older than 30 days are pruned automatically on `pull`/`stats`. Undo snapshots and the worklog are never pruned.
+  可再生的审阅产物（`sample-*.json`、`plan-*.md`）超过 30 天后在 `pull`/`stats` 时自动清理。undo 快照与 worklog 永不清理。
+- Minor efficiency: classification records are flattened once per record and shared between validation and plan rendering (previously computed twice); `list_all` stops as soon as the reported total count is reached (no extra empty page when the library size is an exact multiple of the page size).
+  轻量提速：每条分类记录只展开一次，供校验与计划渲染共用（原先计算两遍）；`list_all` 在达到响应报告的总数后立即停止（库大小恰为页大小整数倍时不再多发一次空页）。
+
+### Notes / 说明
+
+- Follow-up to the 2026-09-22 security review: implements the P2 (low-severity) findings. The per-write readback verification and 3-calls-per-item pattern are unchanged by design (they are this skill's core safety guarantee); the TOCTOU window in the conflict guard is now documented as a known limitation (run `apply` while no other client is writing).
+  系 2026-09-22 安全审查的 P2（低危）跟进。逐条写入的读回核验与每条 3 次调用的模式**有意保持不变**（它们是本 skill 的核心安全保证）；冲突护栏的 TOCTOU 窗口改为文档化已知限制（请在无其他客户端写入时运行 `apply`）。
+- No breaking changes: command-line interfaces, worklog format and state file locations are unchanged.
+  无破坏性变更：命令行接口、worklog 格式与状态文件位置均不变。
+
 ## [1.1.3] - 2026-09-23
 
 ### Fixed / 修复

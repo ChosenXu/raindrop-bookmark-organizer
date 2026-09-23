@@ -18,14 +18,14 @@ Rate-limit probe:
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import sys
 import time
-import urllib.error
-import urllib.request
 
 API = "https://api.raindrop.io/rest/v1"
+HOST = "api.raindrop.io"
 
 
 class RaindropError(RuntimeError):
@@ -37,41 +37,79 @@ class RaindropClient:
         self.token = token or os.environ.get("RD_API_TOKEN")
         if not self.token:
             raise RaindropError("RD_API_TOKEN not set")
-        self.min_interval = min_interval  # conservative pacing between calls
+        self.min_interval = min_interval  # pacing between calls; adapts up on 429
         self._last_call = 0.0
+        self._conn: http.client.HTTPSConnection | None = None
 
     # -- low level ---------------------------------------------------------
+    def _ensure_conn(self) -> http.client.HTTPSConnection:
+        """One persistent connection per client (TCP+TLS handshake reused)."""
+        if self._conn is None:
+            self._conn = http.client.HTTPSConnection(HOST, timeout=30)
+        return self._conn
+
+    def _close_conn(self) -> None:
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            except OSError:
+                pass
+            self._conn = None
+
+    def close(self) -> None:
+        self._close_conn()
+
     def _request(self, method: str, path: str, payload: dict | None = None) -> dict:
-        wait = self.min_interval - (time.monotonic() - self._last_call)
-        if wait > 0:
-            time.sleep(wait)
-        self._last_call = time.monotonic()
-        req = urllib.request.Request(
-            f"{API}{path}",
-            method=method,
-            data=json.dumps(payload).encode() if payload is not None else None,
-            headers={
-                "Authorization": f"Bearer {self.token}",
-                "Content-Type": "application/json",
-            },
-        )
+        body = json.dumps(payload).encode() if payload is not None else None
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+        }
         attempts = 4
         for attempt in range(1, attempts + 1):
+            wait = self.min_interval - (time.monotonic() - self._last_call)
+            if wait > 0:
+                time.sleep(wait)
+            self._last_call = time.monotonic()
             try:
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    return json.loads(resp.read().decode())
-            except urllib.error.HTTPError as e:
-                body = e.read().decode(errors="replace")[:300]
-                if e.code == 429:
-                    raise RaindropError(f"429 rate-limited on {method} {path}") from e
-                raise RaindropError(f"HTTP {e.code} on {method} {path}: {body}") from e
-            except (urllib.error.URLError, OSError) as e:
-                # transient network/SSL failures: retry with backoff
+                conn = self._ensure_conn()
+                conn.request(method, path, body=body, headers=headers)
+                resp = conn.getresponse()
+                data = resp.read().decode(errors="replace")
+                if resp.status == 429:
+                    retry_after = resp.getheader("Retry-After")
+                    try:
+                        delay = float(retry_after) if retry_after else 3 * attempt
+                    except ValueError:  # non-numeric Retry-After (HTTP-date etc.)
+                        delay = 3 * attempt
+                    if attempt == attempts:
+                        raise RaindropError(
+                            f"429 rate-limited on {method} {path} after {attempts} attempts")
+                    # adapt pacing so subsequent calls slow down
+                    # (floor 0.5s: even an unpaced probe backs off after a 429)
+                    self.min_interval = min(max(self.min_interval * 1.5, 0.5), 2.0)
+                    print(f"  [429] {method} {path} — retrying in {delay:.0f}s "
+                          f"(pacing now {self.min_interval:.2f}s)", flush=True)
+                    time.sleep(delay)
+                    continue
+                if not 200 <= resp.status < 300:
+                    raise RaindropError(
+                        f"HTTP {resp.status} on {method} {path}: {data[:300]}")
+                return json.loads(data)
+            except RaindropError:
+                raise
+            except (http.client.HTTPException, OSError, json.JSONDecodeError) as e:
+                # stale/broken connection or transient network failure:
+                # rebuild the connection and retry with backoff
+                self._close_conn()
                 if attempt == attempts:
-                    raise RaindropError(f"network error on {method} {path} after {attempts} attempts: {e}") from e
+                    raise RaindropError(
+                        f"network error on {method} {path} after {attempts} attempts: {e}") from e
                 backoff = 3 * attempt
-                print(f"  [retry {attempt}/{attempts-1}] {method} {path}: {e} — backing off {backoff}s", flush=True)
+                print(f"  [retry {attempt}/{attempts-1}] {method} {path}: {e} "
+                      f"— backing off {backoff}s", flush=True)
                 time.sleep(backoff)
+        raise RaindropError(f"request failed on {method} {path}")  # unreachable
 
     # -- reads -------------------------------------------------------------
     def user(self) -> dict:
@@ -89,14 +127,19 @@ class RaindropClient:
 
     def list_all(self, collection_id: int = 0, perpage: int = 50) -> list[dict]:
         """All raindrops in a collection (0 = all), bulk fields included
-        (title/link/domain/excerpt/type/tags/note)."""
+        (title/link/domain/excerpt/type/tags/note). Stops early once the
+        reported total count is reached (avoids one extra empty page when
+        the library size is an exact multiple of perpage)."""
         items: list[dict] = []
         page = 0
         while True:
             r = self.list_page(collection_id, page, perpage)
             batch = r.get("items", [])
             items.extend(batch)
+            count = r.get("count")
             if len(batch) < perpage:
+                return items
+            if isinstance(count, int) and len(items) >= count:
                 return items
             page += 1
 

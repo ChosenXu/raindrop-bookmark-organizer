@@ -2,7 +2,7 @@
 name: raindrop-bookmark-organizer
 description: Use when the user wants to organize, tag, annotate, or rename bookmarks in their Raindrop.io library (via the Raindrop REST API and an optional Raindrop MCP server). Triggers on mentions of Raindrop, raindrop.io, 书签, bookmarks, 收藏 combined with a batch-organize intent (打标签 / 写描述 / 整理 / tag / annotate / organize). Produces a structured note and three-axis controlled tags for each bookmark; title rewriting is a conservative opt-in step. Supports checkpointed batch processing across sessions for libraries of 1000+ bookmarks.
 agent_created: true
-version: 1.1.3
+version: 1.2.0
 license: MIT
 ---
 
@@ -51,6 +51,10 @@ Free-plan constraint: MCP `search` parameters are Pro-only — never rely on the
 - `delete_bookmarks` is soft-delete (moves to Trash). The skill never deletes bookmarks; it only adds metadata.
 - Before any write: snapshot original state (title/note/tags) into an undo mapping file. The snapshot is flushed to disk before every single write, so an interrupted run never loses undo data.
 - `apply` re-validates every record against the vocabulary rules before writing (invalid records are skipped as `invalid-skip`), coerces ids to integers (path-safety), and rejects unknown `--what` values up front.
+- State files (samples, plans, undo snapshots, worklog) are written with owner-only permissions (0600) and fsync'd; a torn worklog line after a crash is skipped with a warning instead of breaking the tool.
+- The REST client reuses one HTTPS connection per run, retries 429s with backoff (honoring `Retry-After`) and adapts its pacing after a 429; network errors rebuild the connection and retry.
+- Regenerable review artifacts (`sample-*.json`, `plan-*.md`) older than 30 days are pruned automatically on `pull`/`stats`; undo snapshots and the worklog are never pruned.
+- Known limitation (TOCTOU): the conflict guard is a pre-write GET — tags added by another client between check and write would be replaced. Run `apply` while no other client is writing.
 - All reports go to `/tmp/`, never into the repo.
 
 ## Vocabulary & language
