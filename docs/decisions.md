@@ -41,3 +41,11 @@
 ## D5 · Token hygiene (2026-09-08)
 
 The Raindrop API token grants full read/write to the library. It is injected via `RD_API_TOKEN` at runtime. It must never appear in repo files, skill files, logs, or reports. Reports go to `/tmp/` only.
+
+## D7 · Machine-authoritative vocabulary JSON (2026-10-09)
+
+**Problem.** Until v1.2.0 the validator's domain/type/mutex tables were hardcoded in `organize.py` while the normative document was `references/vocabulary.md` — five physical copies of one dataset. This drifted once already (commit `1ad92b1`, a missing 字体 leaf silently rejected valid records), and the status-tag allowlist was hardcoded to one user's personal configuration, contradicting the multi-user custom-file design (D6).
+
+**Decision.** `references/vocabulary.json` is the machine source of truth: domains/leaves, type groups, mutual-exclusion pairs, status tags, and caps. `organize.py` derives `_is_domain`/`GROUPS`/mutex rules and the status allowlist from it at load time, then merges the user's `vocabulary.custom.md` (status enablement, appended domains, renames) into the same table. `references/vocabulary.md` remains the human-readable normative document; a unit test cross-checks the two files so either side drifting turns the suite red.
+
+**Consequence.** Vocabulary amendments are now a one-place edit (json + md), the custom file's documented fields are actually honored by `apply`'s re-validation, and the status axis truly defaults to off (empty allowlist) until a custom file enables it.

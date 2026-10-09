@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "note": "Machine-authoritative tag vocabulary for raindrop-bookmark-organizer. The scripts (organize.py) derive all validation rules from this file. references/vocabulary.md is the human-readable normative document and must stay in sync (a unit test cross-checks the two). Personal extensions (status enablement, appended domains, renames) live in references/vocabulary.custom.md and are merged on load.",
+  "tag_cap": 6,
+  "domain_cap": 2,
+  "free_cap": 2,
+  "domains": {
+    "开发": ["前端", "后端", "移动端", "组件库", "开发工具"],
+    "设计": ["UI 参考", "灵感集", "图标", "字体", "配色", "动效", "排版", "3D"],
+    "AI": ["AI 工具", "AI 资讯", "Agent", "模型评测"],
+    "产品效率": ["效率工具", "笔记知识库", "协作", "自动化"],
+    "数码硬件": ["数码产品", "智能家居"],
+    "影音文化": ["电影", "书籍", "游戏", "音乐"],
+    "阅读学习": ["课程", "语言学习", "科普"],
+    "科学": ["科研", "数学"],
+    "资讯": ["科技资讯", "设计资讯", "周刊日报"],
+    "实用工具": ["查询计算", "安全隐私"]
+  },
+  "type_groups": {
+    "A": ["组件 UI 库", "图标插画", "字体", "模板", "素材库"],
+    "B": ["工具网站", "开源项目"],
+    "C": ["媒体刊物", "文章教程", "文档手册", "视频", "书影记录", "数据报告"],
+    "D": ["清单导航", "社区论坛"],
+    "E": ["作品集", "官网"]
+  },
+  "mutex_leaf_type": {
+    "图标": "图标插画",
+    "字体": "字体",
+    "组件库": "组件 UI 库"
+  },
+  "mutex_type_status": {
+    "开源项目": "开源"
+  },
+  "status_tags": ["待读", "精华", "免费", "开源", "付费", "中文", "英文"],
+  "workflow_status_tags": ["待读", "精华"],
+  "workflow_status_only_types": ["文章教程"]
+}

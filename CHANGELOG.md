@@ -6,6 +6,32 @@ All notable changes to this skill are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 格式参考 Keep a Changelog，版本号遵循语义化版本（SemVer）。
 
+## [1.3.0] - 2026-10-09
+
+### Added / 新增
+
+- Machine-authoritative vocabulary: new `references/vocabulary.json` holds the domains/leaves, the 5 type groups, mutual-exclusion pairs, status tags and per-bookmark caps; `organize.py` derives all validation rules from it instead of hardcoded Python tables. A unit test cross-checks the JSON against `vocabulary.md` so the human document and the machine source can no longer drift silently (the check immediately caught a stale "16 types" count — there are 17).
+  机器权威词表：新增 `references/vocabulary.json` 收录领域/叶标签、5 组形态、互斥对、状态标签与单条标签上限；`organize.py` 的全部校验规则改为从它派生，不再依赖写死在代码里的 Python 表。新增单元测试交叉核对 JSON 与 `vocabulary.md`，两份副本从此无法悄悄漂移（该检查当即抓到一处陈旧的「16 类」计数——实际是 17 类）。
+- The batch validator now merges the user's `vocabulary.custom.md`: `status_axis_enabled` / `status_tags` control which status tags pass validation, `domains_append` and `domain_renames` extend the accepted domain membership. The documented custom-file fields are finally honored by `apply`'s re-validation, making the two-layer vocabulary (D6) real instead of doc-only.
+  批处理校验器现会合并用户的 `vocabulary.custom.md`：`status_axis_enabled` / `status_tags` 决定哪些状态标签能通过校验，`domains_append` 与 `domain_renames` 扩充合法领域成员。文档承诺的 custom 字段从此真正被 `apply` 的写入前复验执行，两层词表设计（D6）从纸面变为现实。
+- New offline test suites: a fake-connection harness for `rd_client` (429 retry counting, `Retry-After`, pacing adaptation, connection rebuild, payload guards, update readback comparison, `list_all` early stop) and state-machine tests for `organize` (corrupt worklog lines, legacy flatten, terminal pending states, artifact pruning). 58 tests total, stdlib-only, no network.
+  新增离线测试：`rd_client` 假连接测试台（429 重试计数、`Retry-After`、节奏自适应、连接重建、载荷防护、update 读回比对、`list_all` 提前停页）与 `organize` 状态机测试（损坏 worklog 行、legacy 展平、终态判定、产物清理）。共 58 项，仅用标准库，无需网络。
+- `docs/decisions.md` records the rationale as D7.
+  `docs/decisions.md` 以 D7 记录了上述决策与理由。
+
+### Changed / 变更
+
+- **Behavior change**: the status-tag allowlist is no longer hardcoded to 待读/精华. With no `vocabulary.custom.md` the status axis is off (per the documented default), and only tags enabled in the custom file pass validation. This repo ships a local (gitignored) `vocabulary.custom.md` enabling 待读/精华, so the maintainer's behavior is unchanged.
+  **行为变化**：状态标签白名单不再写死为 待读/精华。没有 `vocabulary.custom.md` 时状态轴默认关闭（与文档一致），仅 custom 文件启用的标签能通过校验。本仓库附带一个本地（已 gitignore）的 `vocabulary.custom.md` 启用 待读/精华，维护者自身行为不受影响。
+- Workflow status enforcement now covers both 待读 and 精华 (previously only 待读 was checked), matching the vocabulary rule "workflow tags apply to single-article pages only".
+  工作流状态标签的形态限制现同时覆盖 待读 与 精华（原先只查 待读），与词表「工作流标签仅限单篇文章页」的规则一致。
+- `--rate-probe` is honest again: the probe now runs with internal 429 retries disabled (`retry_429=False`), so counts reflect the real rate limit instead of being masked by v1.2.0's retry-and-backoff machinery.
+  `--rate-probe` 恢复本意：探针运行时关闭内部 429 重试（`retry_429=False`），计数反映真实限流线，不再被 v1.2.0 的重试退避机制掩盖。
+- `rd_client._smoke` cleanup hardening: removed `assert`-based control flow (it vanishes under `python3 -O`), and raindrop deletions now get a readback check per the D4 rule, reporting `cleaned N/M`.
+  `rd_client._smoke` 清理阶段加固：去掉基于 `assert` 的控制流（`python3 -O` 下会被跳过），书签删除后按 D4 规则回读核验，报告 `cleaned N/M`。
+- SKILL.md: the vocabulary section now points to `vocabulary.md`/`vocabulary.json` instead of restating its details; stale "(v1.0.0)" version tag removed from the Out-of-scope heading.
+  SKILL.md：词表一节改为指向 `vocabulary.md`/`vocabulary.json` 的指针，不再复述细节；Out-of-scope 标题上过期的「(v1.0.0)」版本号已移除。
+
 ## [1.2.0] - 2026-09-23
 
 ### Added / 新增
@@ -56,6 +82,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 - Security review follow-up (4 medium findings fixed; report of 2026-09-22). New worklog state `invalid-skip` is terminal, like `conflict-skip`: reclassify the item and re-run the plan→apply cycle. No workflow changes for valid inputs.
   系安全审查跟进（修复 4 项中危发现；审查报告 2026-09-22）。新增 worklog 状态 `invalid-skip` 与 `conflict-skip` 一样为终态：重新分类该条目并重跑 plan→apply 循环即可。对合法输入而言工作流无任何变化。
+
+## [1.1.2] - 2026-09-17
+
+### Changed / 变更
+
+- Cross-linked the sibling skill [raindrop-collection-governance](https://github.com/ChosenXu/raindrop-collection-governance) in both READMEs (Related skills section): collection restructuring stays out of scope here and is covered there.
+  两个 README 的「相关 skill」小节加入兄弟项目 [raindrop-collection-governance](https://github.com/ChosenXu/raindrop-collection-governance) 的互链：收藏夹重组不在本 skill 范围内，由对方负责。
+
+### Notes / 说明
+
+- Documentation-only release; this entry was backfilled on 2026-10-09 (the version was tagged but originally missed its CHANGELOG entry and GitHub Release).
+  纯文档版本；本条目为 2026-10-09 补记（当时只打了 tag，遗漏了 CHANGELOG 条目与 GitHub Release）。
 
 ## [1.1.1] - 2026-09-10
 

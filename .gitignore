@@ -8,3 +8,5 @@ __pycache__/
 # never commit credentials or reports
 *.token
 *.report.md
+# personal vocabulary config (user-created from the example template)
+references/vocabulary.custom.md

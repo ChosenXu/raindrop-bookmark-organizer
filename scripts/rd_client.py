@@ -33,11 +33,13 @@ class RaindropError(RuntimeError):
 
 
 class RaindropClient:
-    def __init__(self, token: str | None = None, min_interval: float = 0.35):
+    def __init__(self, token: str | None = None, min_interval: float = 0.35,
+                 retry_429: bool = True):
         self.token = token or os.environ.get("RD_API_TOKEN")
         if not self.token:
             raise RaindropError("RD_API_TOKEN not set")
         self.min_interval = min_interval  # pacing between calls; adapts up on 429
+        self.retry_429 = retry_429  # False = probe mode: surface 429s immediately
         self._last_call = 0.0
         self._conn: http.client.HTTPSConnection | None = None
 
@@ -77,6 +79,11 @@ class RaindropClient:
                 resp = conn.getresponse()
                 data = resp.read().decode(errors="replace")
                 if resp.status == 429:
+                    if not self.retry_429:
+                        # probe mode: report the 429 immediately so the rate
+                        # probe can measure the real limit (internal retries
+                        # would mask it and their backoff breaks the burst)
+                        raise RaindropError(f"429 on {method} {path} (probe mode)")
                     retry_after = resp.getheader("Retry-After")
                     try:
                         delay = float(retry_after) if retry_after else 3 * attempt
@@ -201,7 +208,9 @@ def _smoke() -> int:
     u = rc.user()
     print(f"user: {u['_id']} ({u.get('fullName')})")
     cid = rc.create_collection("rd-client-smoke")
-    assert cid, "collection create failed"
+    if not cid:
+        print("collection create failed")
+        return 1
     print(f"scratch collection: {cid}")
     try:
         r = rc._request(
@@ -216,24 +225,30 @@ def _smoke() -> int:
         print(f"update verified: {res['applied']}, tags now: {res['item']['tags']}")
         res2 = rc.update(rid, tags=["smoke-b"])  # replace semantics check
         print(f"replace to [smoke-b]: applied={res2['applied']}, tags={res2['item']['tags']}")
-        return 0 if res["applied"] and res2["applied"] else 1
+        ok = bool(res["applied"] and res2["applied"])
     finally:
-        # cleanup: delete raindrop then collection
-        rid_local = None
+        # cleanup: delete raindrops (with readback per D4) then the collection
         try:
             items = rc.list_all(cid)
+            cleaned = 0
             for it in items:
                 rc._request("DELETE", f"/raindrop/{it['_id']}")
-                rid_local = it["_id"]
-            print(f"cleaned raindrops in {cid}")
+                if rc.get(it["_id"]) is None:
+                    cleaned += 1
+                else:
+                    print(f"cleanup warning: {it['_id']} still readable after delete")
+            print(f"cleaned {cleaned}/{len(items)} raindrops in {cid}")
         except Exception as e:  # noqa: BLE001
             print(f"cleanup warning: {e}")
         rc.delete_collection(cid)
         print("scratch collection deleted")
+    return 0 if ok else 1
 
 
 def _rate_probe(n: int = 40) -> int:
-    rc = RaindropClient(min_interval=0.0)  # no pacing: find the real limit
+    # probe mode: no internal 429 retries and no pacing, so the counts
+    # reflect the real rate limit instead of the retry machinery
+    rc = RaindropClient(min_interval=0.0, retry_429=False)
     codes = {"ok": 0, "429": 0, "err": 0}
     t0 = time.monotonic()
     for i in range(n):

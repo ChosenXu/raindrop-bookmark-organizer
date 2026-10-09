@@ -2,7 +2,7 @@
 name: raindrop-bookmark-organizer
 description: Use when the user wants to organize, tag, annotate, or rename bookmarks in their Raindrop.io library (via the Raindrop REST API and an optional Raindrop MCP server). Triggers on mentions of Raindrop, raindrop.io, 书签, bookmarks, 收藏 combined with a batch-organize intent (打标签 / 写描述 / 整理 / tag / annotate / organize). Produces a structured note and three-axis controlled tags for each bookmark; title rewriting is a conservative opt-in step. Supports checkpointed batch processing across sessions for libraries of 1000+ bookmarks.
 agent_created: true
-version: 1.2.0
+version: 1.3.0
 license: MIT
 ---
 
@@ -50,7 +50,7 @@ Free-plan constraint: MCP `search` parameters are Pro-only — never rely on the
 - `delete_tags` lies about success (it reports `deleted:N` even for tags that do not exist). Every delete is followed by readback verification; the `deleted` count alone is never trusted.
 - `delete_bookmarks` is soft-delete (moves to Trash). The skill never deletes bookmarks; it only adds metadata.
 - Before any write: snapshot original state (title/note/tags) into an undo mapping file. The snapshot is flushed to disk before every single write, so an interrupted run never loses undo data.
-- `apply` re-validates every record against the vocabulary rules before writing (invalid records are skipped as `invalid-skip`), coerces ids to integers (path-safety), and rejects unknown `--what` values up front.
+- `apply` re-validates every record against the vocabulary rules before writing (invalid records are skipped as `invalid-skip`; rules derive from `references/vocabulary.json` merged with the user's `vocabulary.custom.md`), coerces ids to integers (path-safety), and rejects unknown `--what` values up front.
 - State files (samples, plans, undo snapshots, worklog) are written with owner-only permissions (0600) and fsync'd; a torn worklog line after a crash is skipped with a warning instead of breaking the tool.
 - The REST client reuses one HTTPS connection per run, retries 429s with backoff (honoring `Retry-After`) and adapts its pacing after a 429; network errors rebuild the connection and retry.
 - Regenerable review artifacts (`sample-*.json`, `plan-*.md`) older than 30 days are pruned automatically on `pull`/`stats`; undo snapshots and the worklog are never pruned.
@@ -59,13 +59,11 @@ Free-plan constraint: MCP `search` parameters are Pro-only — never rely on the
 
 ## Vocabulary & language
 
-Tag skeleton: three axes (Domain 1–2, Type 1, Status 0–2 **off by default — enable all or selectively via the custom file; workflow tags 待读/精华 apply only to single-article pages, never to site-level bookmarks**) plus up to 2 free supplementary tags — **hard cap 6 tags per bookmark**. Type has 16 members in 5 semantic groups (assets / interactive / content / directories / identity); classify by group first. `工具网站` is reserved for interactive tools; editorial/media sites take `媒体刊物`; portfolios and official sites take `作品集`/`官网`. Mutual-exclusion rules live in the vocabulary file; never tag both sides of a conflicting pair. Full rules in `references/vocabulary.md`.
+Tags are selected verbatim from the controlled vocabulary in `references/vocabulary.md` (normative): three axes — Domain (1–2), Type (exactly 1, picked from the 5 semantic groups), Status (0–2, **off by default**) — plus up to 2 free supplementary tags, hard cap 6 per bookmark. Workflow status tags (待读/精华) apply only to single-article pages, never site-level bookmarks. Never tag both sides of a conflicting pair; never invent skeleton tags. Read the vocabulary file before tagging; never mix languages for the same tag across bookmarks.
 
-Loading order:
-1. If `references/vocabulary.custom.md` exists (user-created from the provided example template), read it first — it overrides/extends the skeleton: tag language, status-axis on/off, private domains, renames, optional collection mapping.
-2. Otherwise use `references/vocabulary.md` defaults.
+Machine authority: `references/vocabulary.json` drives the batch validator in `scripts/organize.py`; `vocabulary.md` is its human-readable twin, kept in sync by a unit test. Loading order: if `references/vocabulary.custom.md` exists (user-created from the provided example template), read it first — it overrides/extends the skeleton (tag language, status-axis enablement, private domains, renames, optional collection mapping), and the validator merges the same file. Otherwise defaults apply.
 
-Skeleton tag language: explicit user instruction > invocation-language inheritance > default 简体中文. `vocabulary.md` carries the canonical zh/en columns; never mix languages for the same tag across bookmarks.
+Skeleton tag language: explicit user instruction > invocation-language inheritance > default 简体中文. `vocabulary.md` carries the canonical zh/en columns.
 
 If a collection mapping exists in the custom file, additionally output a suggested target collection per bookmark — suggestion only, never move bookmarks.
 
@@ -74,12 +72,13 @@ If a collection mapping exists in the custom file, additionally output a suggest
 Load only when needed:
 
 - `references/vocabulary.md` — default skeleton vocabulary (always load before tagging)
+- `references/vocabulary.json` — machine-authoritative vocabulary consumed by the validator
 - `references/vocabulary.custom.example.md` — template for the user's personal extension file
 - `scripts/organize.py` — batch engine: candidate pull, checkpoint worklog, dry-run plan rendering
 - `docs/decisions.md` — architecture decisions and their rationale
 - `scripts/rd_client.py` — REST client: paginated reads, batched writes, verification readback
 
-## Out of scope (v1.0.0)
+## Out of scope
 
 - Skeleton languages beyond the built-in zh/en columns
 - Collection restructuring, highlights processing

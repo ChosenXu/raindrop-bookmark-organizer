@@ -173,14 +173,121 @@ def cmd_pull(sample: int, out: Path | None) -> int:
     return 0
 
 
-GROUPS = {  # type member -> semantic group
-    "组件 UI 库": "A", "图标插画": "A", "字体": "A", "模板": "A", "素材库": "A",
-    "工具网站": "B", "开源项目": "B",
-    "媒体刊物": "C", "文章教程": "C", "文档手册": "C", "视频": "C", "书影记录": "C", "数据报告": "C",
-    "清单导航": "D", "社区论坛": "D",
-    "作品集": "E", "官网": "E",
-}
-MUTEX_LEAF_TYPE = {"字体": "字体", "图标": "图标插画", "组件库": "组件 UI 库"}
+# --- vocabulary: single machine source (references/vocabulary.json) --------
+_VOCAB_PATH = Path(__file__).resolve().parent.parent / "references" / "vocabulary.json"
+_CUSTOM_PATH = Path(__file__).resolve().parent.parent / "references" / "vocabulary.custom.md"
+
+
+def _bracket_list(s: str) -> list[str]:
+    """'[a, b]' -> ['a', 'b']; lenient, brackets/quotes stripped."""
+    s = s.strip().strip("[]").strip()
+    if not s:
+        return []
+    return [x.strip().strip("\"'") for x in s.split(",") if x.strip()]
+
+
+def _parse_custom(path: Path) -> dict:
+    """Lenient parse of the user's vocabulary.custom.md (a documentation-first
+    file; unrecognized lines are ignored, comments and fences skipped).
+    Returns only the fields the validator consumes."""
+    out: dict = {"status_axis": None, "status_tags": None,
+                 "domains_append": {}, "renames": []}
+    try:
+        lines = path.read_text().splitlines()
+    except OSError:
+        return out
+    section = None  # None | "domains_append" | "renames"
+    current_domain = None
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith("```"):
+            continue
+        if line.startswith("status_axis_enabled:"):
+            out["status_axis"] = line.split(":", 1)[1].strip().lower() == "true"
+            section = None
+        elif line.startswith("status_tags:"):
+            out["status_tags"] = _bracket_list(line.split(":", 1)[1])
+            section = None
+        elif line.startswith("domains_append:"):
+            section, current_domain = "domains_append", None
+        elif line.startswith("domain_renames:"):
+            section = "renames"
+        elif section == "domains_append":
+            if line.startswith("- "):
+                line = line[2:].strip()
+            if line.startswith("domain:"):
+                current_domain = line.split(":", 1)[1].strip()
+                out["domains_append"][current_domain] = []
+            elif line.startswith("leaves:") and current_domain:
+                out["domains_append"][current_domain] = _bracket_list(line.split(":", 1)[1])
+            else:
+                section = None  # unrelated line ends the section
+        elif section == "renames":
+            if ":" in line and not line.startswith("- "):
+                old, _, new = line.partition(":")
+                out["renames"].append((old.strip(), new.strip()))
+            else:
+                section = None
+    return out
+
+
+def _add_member(members: set, name: str) -> None:
+    """Register a domain member. The custom file may carry zh+en in one
+    string ("求职招聘 career", mirroring vocabulary.md's two-column style):
+    both the full string and the zh alias are accepted."""
+    members.add(name)
+    tokens = name.split()
+    if len(tokens) > 1 and tokens[-1].isascii():
+        members.add(" ".join(tokens[:-1]))
+
+
+def load_vocabulary(vocab_path: Path = _VOCAB_PATH,
+                    custom_path: Path | None = _CUSTOM_PATH) -> dict:
+    """Load the machine vocabulary (vocabulary.json) and merge the user's
+    vocabulary.custom.md when it exists. The status axis starts EMPTY
+    (off by default, per vocabulary.md) and is enabled only by the custom
+    file: status_axis_enabled: true turns on every status tag, or
+    status_tags: [...] turns on a selective list."""
+    data = json.loads(vocab_path.read_text())
+    members = set(data["domains"])
+    for leaves in data["domains"].values():
+        members.update(leaves)
+    empty_custom = {"status_axis": None, "status_tags": None,
+                    "domains_append": {}, "renames": []}
+    custom = _parse_custom(custom_path) if custom_path and custom_path.exists() else empty_custom
+    for name in custom["domains_append"]:
+        _add_member(members, name)
+    for leaves in custom["domains_append"].values():
+        for leaf in leaves:
+            _add_member(members, leaf)
+    for _old, new in custom["renames"]:
+        _add_member(members, new)  # renames never delete defaults; new names must validate
+    if custom["status_axis"] is True:
+        enabled = set(data["status_tags"])
+    elif custom["status_tags"] is not None:
+        allowed = set(data["status_tags"])
+        enabled = {t for t in custom["status_tags"] if t in allowed}
+    else:
+        enabled = set()
+    return {
+        "domain_members": members,
+        "type_groups": {t: g for g, ts in data["type_groups"].items() for t in ts},
+        "types": {t for ts in data["type_groups"].values() for t in ts},
+        "mutex_leaf_type": dict(data["mutex_leaf_type"]),
+        "mutex_type_status": dict(data["mutex_type_status"]),
+        "status_tags": set(data["status_tags"]),
+        "status_enabled": enabled,
+        "workflow_status_tags": set(data["workflow_status_tags"]),
+        "workflow_status_only_types": set(data["workflow_status_only_types"]),
+        "tag_cap": data["tag_cap"],
+        "domain_cap": data["domain_cap"],
+        "free_cap": data["free_cap"],
+    }
+
+
+VOCAB = load_vocabulary()
+GROUPS = VOCAB["type_groups"]  # type member -> semantic group letter
+MUTEX_LEAF_TYPE = VOCAB["mutex_leaf_type"]
 
 
 def flatten(rec: dict) -> dict:
@@ -199,47 +306,46 @@ def flatten(rec: dict) -> dict:
     if not isinstance(t, list):
         t = []
     typ = next((x for x in t if x in GROUPS), "")
-    st = [x for x in t if x in {"待读", "精华", "免费", "开源", "付费", "中文", "英文"}]
+    st = [x for x in t if x in VOCAB["status_tags"]]
     dom = [x for x in t if x != typ and x not in st and _is_domain(x)]
     free = [x for x in t if x != typ and x not in st and x not in dom]
     return {"domain": dom, "type": typ, "status": st, "free": free, "tags": t}
 
 
 def _is_domain(x: str) -> bool:
-    return x in {"开发", "设计", "AI", "产品效率", "数码硬件", "影音文化",
-                 "阅读学习", "科学", "资讯", "实用工具"} or x in {
-        "前端", "后端", "移动端", "组件库", "开发工具", "UI 参考", "灵感集", "图标",
-        "字体", "配色", "动效", "排版", "3D", "AI 工具", "AI 资讯", "Agent", "模型评测",
-        "效率工具", "笔记知识库", "协作", "自动化", "数码产品", "智能家居",
-        "电影", "书籍", "游戏", "音乐", "课程", "语言学习", "科普",
-        "科研", "数学", "科技资讯", "设计资讯", "周刊日报", "查询计算", "安全隐私"}
+    return x in VOCAB["domain_members"]
 
 
 def validate(rec: dict, f: dict | None = None) -> list[str]:
     """Role-aware rule check. Returns list of issue strings (empty = pass).
-    `f` may carry a pre-flattened record (see flatten) to avoid double work."""
+    All rules derive from the merged vocabulary (module-level VOCAB =
+    vocabulary.json + optional vocabulary.custom.md); `f` may carry a
+    pre-flattened record (see flatten) to avoid double work."""
     f = f if f is not None else flatten(rec)
     issues = []
-    if len(f["tags"]) > 6:
+    if len(f["tags"]) > VOCAB["tag_cap"]:
         issues.append("cap>6")
     if len(set(f["tags"])) != len(f["tags"]):
         issues.append("duplicate-tags")
-    if not f["type"] or f["type"] not in GROUPS:
+    if not f["type"] or f["type"] not in VOCAB["types"]:
         issues.append(f"type-invalid:{f['type']!r}")
-    if not 1 <= len(f["domain"]) <= 2:
+    if not 1 <= len(f["domain"]) <= VOCAB["domain_cap"]:
         issues.append(f"domain-count:{f['domain']}")
-    bad_dom = [x for x in f["domain"] if not _is_domain(x)]
+    bad_dom = [x for x in f["domain"] if x not in VOCAB["domain_members"]]
     if bad_dom:
         issues.append(f"domain-membership:{bad_dom}")
-    for leaf, typ in MUTEX_LEAF_TYPE.items():
+    for leaf, typ in VOCAB["mutex_leaf_type"].items():
         if leaf in f["domain"] and f["type"] == typ:
             issues.append(f"mutex:{leaf}+{typ}")
-    if f["type"] == "开源项目" and "开源" in f["status"]:
-        issues.append("mutex:开源项目+开源")
-    if "待读" in f["status"] and f["type"] != "文章教程":
-        issues.append("待读-not-single-article")
-    allowed_status = {"待读", "精华"}  # user's selective enablement
-    bad = set(f["status"]) - allowed_status
+    for typ, st_tag in VOCAB["mutex_type_status"].items():
+        if f["type"] == typ and st_tag in f["status"]:
+            issues.append(f"mutex:{typ}+{st_tag}")
+    wf_bad = [t for t in f["status"]
+              if t in VOCAB["workflow_status_tags"]
+              and f["type"] not in VOCAB["workflow_status_only_types"]]
+    if wf_bad:
+        issues.append(f"workflow-not-single-article:{wf_bad}")
+    bad = set(f["status"]) - VOCAB["status_enabled"]
     if bad:
         issues.append(f"status-not-enabled:{sorted(bad)}")
     return issues
@@ -287,6 +393,25 @@ def cmd_plan(cls_path: Path, out: Path | None) -> int:
     return 0
 
 
+def _record_pending(r: dict, status: dict) -> bool:
+    """A record is pending only under a non-terminal status. The
+    int-normalized worklog key takes precedence (log_state always writes
+    the coerced id); the raw key is the fallback for unparseable ids
+    (logged verbatim as invalid-skip)."""
+    try:
+        rid_int = int(r["id"])
+    except (AttributeError, KeyError, TypeError, ValueError):
+        rid_int = None
+    if rid_int is not None:
+        s = status.get(rid_int)
+        if s is not None:
+            return s == "classified-dryrun"
+    try:
+        return status.get(r["id"]) == "classified-dryrun"
+    except (AttributeError, KeyError, TypeError):
+        return False  # non-dict record or unhashable id: never pending
+
+
 def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
     """Write classified bookmarks back to Raindrop with verification.
 
@@ -312,26 +437,7 @@ def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
     rc = RaindropClient()
     records = json.loads(cls_path.read_text())
     status = load_worklog()
-
-    def _is_pending(r: dict) -> bool:
-        """A record is pending only under a non-terminal status. The
-        int-normalized worklog key takes precedence (log_state always writes
-        the coerced id); the raw key is the fallback for unparseable ids
-        (logged verbatim as invalid-skip)."""
-        try:
-            rid_int = int(r["id"])
-        except (AttributeError, KeyError, TypeError, ValueError):
-            rid_int = None
-        if rid_int is not None:
-            s = status.get(rid_int)
-            if s is not None:
-                return s == "classified-dryrun"
-        try:
-            return status.get(r["id"]) == "classified-dryrun"
-        except (AttributeError, KeyError, TypeError):
-            return False  # non-dict record or unhashable id: never pending
-
-    pending = [r for r in records if _is_pending(r)]
+    pending = [r for r in records if _record_pending(r, status)]
     if limit:
         pending = pending[:limit]
     if not pending:

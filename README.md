@@ -11,7 +11,7 @@ For every untagged bookmark it produces:
 1. **Note** — 1–2 sentences: what it is + when you'll reach for it (40–80 characters in Chinese, 30–60 words in English)
 2. **Tags** — up to 6, selected verbatim from a controlled three-axis vocabulary:
    - **Domain** (1–2): 10 categories ≈ 37 leaves — Dev / Design / AI / Productivity / Hardware / Media & Culture / Learning / Science / News / Utilities
-   - **Type** (exactly 1): 16 types in 5 semantic groups — Assets / Interactive / Content / Discovery / Identity
+   - **Type** (exactly 1): 17 types in 5 semantic groups — Assets / Interactive / Content / Discovery / Identity
    - **Status** (0–2, off by default): to-read · starred · free · oss · paid · zh · en
 3. **Title rewrite** — conservative, opt-in, default OFF; garbage titles only
 
@@ -90,6 +90,7 @@ docs/
   decisions.md                      # architecture decisions & rationale
 references/
   vocabulary.md                     # universal three-axis skeleton (zh/en, normative)
+  vocabulary.json                   # machine-authoritative vocabulary consumed by the validator
   vocabulary.custom.example.md      # template for the personal extension layer
 scripts/
   rd_client.py                      # REST client: bulk reads, verified writes, self-test
