@@ -168,9 +168,11 @@ class VocabularyLoaderTests(unittest.TestCase):
             v = og.load_vocabulary(custom_path=tmp / "custom.md")
         self.assertEqual(v["status_enabled"], set())
 
-    def test_repo_default_vocab_uses_repo_custom(self):
-        # this repo ships a custom file enabling 待读/精华
-        self.assertEqual(og.VOCAB["status_enabled"], {"待读", "精华"})
+    def test_repo_default_vocab_respects_status_vocabulary(self):
+        # The repo may or may not carry a local (gitignored) custom file
+        # enabling 待读/精华 — CI sees none. Either way the merged result
+        # must stay inside the vocabulary's status-tag set.
+        self.assertLessEqual(og.VOCAB["status_enabled"], og.VOCAB["status_tags"])
 
     def test_caps_from_json(self):
         self.assertEqual(og.VOCAB["tag_cap"], 6)
