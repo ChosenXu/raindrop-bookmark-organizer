@@ -98,6 +98,29 @@ class ValidateTests(unittest.TestCase):
             issues = og.validate({}, f=flat(type="工具网站", status=("免费",)))
         self.assertEqual(issues, [])
 
+    def test_free_cap_exceeded(self):
+        # 3 free + 2 domain + 1 type = 6 tags: within tag_cap, over free_cap
+        issues = og.validate({}, f={
+            "tags": ["开发", "设计", "文章教程", "a", "b", "c"],
+            "type": "文章教程", "domain": ["开发", "设计"], "status": [],
+            "free": ["a", "b", "c"]})
+        self.assertTrue(any(i.startswith("free-cap") for i in issues), issues)
+
+    def test_free_cap_exact_passes(self):
+        issues = og.validate({}, f={
+            "tags": ["开发", "设计", "文章教程", "a", "b"],
+            "type": "文章教程", "domain": ["开发", "设计"], "status": [],
+            "free": ["a", "b"]})
+        self.assertEqual(issues, [])
+
+    def test_status_cap_exceeded(self):
+        vocab = dict(og.VOCAB)
+        vocab["status_enabled"] = {"待读", "精华", "免费"}
+        with mock.patch.object(og, "VOCAB", vocab):
+            issues = og.validate({}, f=flat(
+                type="文章教程", status=("待读", "精华", "免费")))
+        self.assertTrue(any(i.startswith("status-cap") for i in issues), issues)
+
 
 # --- vocabulary loader -------------------------------------------------------
 
@@ -247,6 +270,10 @@ class VocabularyMarkdownConsistencyTests(unittest.TestCase):
         # 17 was verified against vocabulary.md (SKILL.md/README said "16" —
         # a stale count this consistency check exists to catch)
         self.assertEqual(len(json_types), 17)
+        # the prose header in vocabulary.md must also state 17 — a stale
+        # count in prose is invisible to the table cross-check above
+        self.assertIn("17 types in 5 semantic groups", self.md)
+        self.assertNotIn("16 types", self.md)
 
     def test_status_tags_match(self):
         for line in self.md.splitlines():
@@ -370,6 +397,17 @@ class PruneTests(unittest.TestCase):
         self.assertTrue(new_sample.exists())
         self.assertTrue(undo.exists())
         self.assertTrue(worklog.exists())
+
+
+class WritePrivateTests(unittest.TestCase):
+    def test_writes_utf8_0600_no_temp_leftover(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "sub" / "state.json"
+            og._write_private(p, '{"t": "中文标题 🚀"}')
+            self.assertEqual(p.read_text(encoding="utf-8"), '{"t": "中文标题 🚀"}')
+            self.assertEqual(os.stat(p).st_mode & 0o777, 0o600)
+            leftovers = [x.name for x in (Path(d) / "sub").iterdir() if ".tmp-" in x.name]
+            self.assertEqual(leftovers, [])
 
 
 if __name__ == "__main__":

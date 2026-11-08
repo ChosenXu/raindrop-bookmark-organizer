@@ -6,6 +6,35 @@ All notable changes to this skill are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 格式参考 Keep a Changelog，版本号遵循语义化版本（SemVer）。
 
+## [1.3.1] - 2026-11-08
+
+### Fixed / 修复
+
+- All state-file reads and writes now use explicit UTF-8 encoding. Without it, `pull`/`plan`/`apply` crashed writing or reading Chinese/emoji bookmark titles and notes on locales whose default is not UTF-8 (e.g. Windows cp1252/gbk), and `load_vocabulary` could fail at import reading the UTF-8 `vocabulary.json`; macOS/Linux default UTF-8 hid the problem.
+  状态文件的读写全部改为显式 UTF-8。此前在默认编码非 UTF-8 的 locale（如 Windows cp1252/gbk）下，`pull`/`plan`/`apply` 读写含中文/emoji 的标题与描述会崩溃，`load_vocabulary` 读取 UTF-8 的 `vocabulary.json` 也可能在 import 期失败；macOS/Linux 默认 UTF-8 一直掩盖了该问题。
+- The validator now enforces the documented `free-cap` (≤2 free tags) and `status-cap` (≤2 status tags); previously `free_cap` was loaded but never checked, so `apply` could write a record with 3 free tags (2 domain + 1 type + 3 free = 6) that violates the composition rules.
+  校验器现执行文档约定的 `free-cap`（自由标签 ≤2）与 `status-cap`（状态标签 ≤2）；此前 `free_cap` 虽载入却从不校验，`apply` 可能写入「2 领域 + 1 形态 + 3 自由 = 6」这类违反组合规则的记录。
+- The undo snapshot is now written atomically (sibling temp file + `os.replace()` + directory fsync). A crash during the old truncate-then-write could truncate the whole `.undo.json` and lose rollback data for every prior item, contradicting the documented "an interrupted run never loses undo data".
+  undo 快照改为原子写（同目录临时文件 + `os.replace()` + 目录 fsync）。旧实现的「先截断再写」若在写入中途崩溃，会把整个 `.undo.json` 截断、丢失此前所有条目的回滚数据，与文档「中断的执行不会丢失 undo 数据」相矛盾。
+- `plan` and `apply` now fail cleanly (exit 2) on a missing or malformed class file (non-array JSON) instead of dumping a traceback, and `rc` is no longer left unclosed on early returns or exceptions (`cmd_pull`/`cmd_stats` now close it in a `finally`).
+  `plan` 与 `apply` 在类文件缺失或 JSON 畸形（非数组）时干净退出（exit 2），不再抛 traceback；`rc` 在提前返回或异常时不再泄漏（`cmd_pull`/`cmd_stats` 用 `finally` 关闭）。
+
+### Changed / 变更
+
+- `references/vocabulary.md` prose now says "17 types" (was a stale "16"); the json↔md consistency test additionally asserts the prose count, so a stale count in prose can no longer slip past the table-only cross-check.
+  `references/vocabulary.md` 正文改为「17 types」（原为陈旧的「16」）；json↔md 一致性测试新增对散文计数的断言，散文里的陈旧计数不再能绕过仅查表格的交叉核对。
+- Both READMEs Structure sections now list `tests/` and `.github/workflows/ci.yml`.
+  两个 README 的「目录结构」现已列出 `tests/` 与 `.github/workflows/ci.yml`。
+- `docs/decisions.md` decision order corrected so D5 (token hygiene) precedes D6 (two-layer vocabulary).
+  `docs/decisions.md` 决策顺序修正，D5（token 卫生）排在 D6（两层词表）之前。
+
+### Notes / 说明
+
+- Version bumped 1.3.0 → 1.3.1 (PATCH: fixes and docs only; no CLI, workflow, or worklog/state-format changes).
+  版本 1.3.0 → 1.3.1（PATCH：仅修复与文档；CLI、工作流、worklog/状态格式均无变化）。
+- Tests: 58 → 62 (added free-cap / status-cap validation cases and a `_write_private` UTF-8/0600/atomicity test).
+  测试：58 → 62（新增 free-cap / status-cap 校验用例与 `_write_private` 的 UTF-8/0600/原子性测试）。
+
 ## [1.3.0] - 2026-10-09
 
 ### Added / 新增

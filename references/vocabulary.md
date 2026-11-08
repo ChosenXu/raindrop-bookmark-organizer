@@ -41,7 +41,7 @@ Rules:
 
 ## Axis 2 · 形态 Type（必选 1 个）
 
-What the bookmark **is** — decides how it will be used again. 16 types in 5 semantic groups; classify by group first ("是拿来用的 / 看的 / 取的 / 找的 / 认人的"), then pick the member. Tags are flat when written.
+What the bookmark **is** — decides how it will be used again. 17 types in 5 semantic groups; classify by group first ("是拿来用的 / 看的 / 取的 / 找的 / 认人的"), then pick the member. Tags are flat when written.
 
 ### A · 资产类 — 拿来取用的东西
 

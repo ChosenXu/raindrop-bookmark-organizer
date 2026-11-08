@@ -46,22 +46,41 @@ DEFAULT_OUT = STATE_DIR
 
 
 def _write_private(path: Path, text: str) -> None:
-    """Write a state file with owner-only permissions (0600), fsync'd —
-    state files carry full bookmark metadata and belong to the user alone.
-    fchmod heals legacy files created 0644 by earlier versions."""
+    """Write a state file atomically with owner-only permissions (0600), fsync'd.
+    State files carry full bookmark metadata and belong to the user alone.
+    The text goes to a sibling temp file and os.replace()'d into place, so a
+    crash mid-write leaves the previous good file intact instead of a truncated
+    one (critical for the undo snapshot). fchmod heals legacy 0644 files."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
-        os.fchmod(f.fileno(), 0o600)
-        f.write(text)
-        f.flush()
-        os.fsync(f.fileno())
+    tmp = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            os.fchmod(f.fileno(), 0o600)
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+        try:
+            dfd = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(dfd)
+            finally:
+                os.close(dfd)
+        except OSError:
+            pass
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def log_state(rid: int | str, status: str) -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     fd = os.open(WORKLOG, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-    with os.fdopen(fd, "a") as f:
+    with os.fdopen(fd, "a", encoding="utf-8") as f:
         os.fchmod(f.fileno(), 0o600)  # heal legacy 0644 worklogs
         f.write(json.dumps({"id": rid, "status": status,
                             "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}) + "\n")
@@ -77,7 +96,7 @@ def load_worklog() -> dict[int, str]:
         return {}
     out: dict[int, str] = {}
     bad = 0
-    for lineno, line in enumerate(WORKLOG.read_text().splitlines(), 1):
+    for lineno, line in enumerate(WORKLOG.read_text(encoding="utf-8").splitlines(), 1):
         if not line.strip():
             continue
         try:
@@ -154,10 +173,12 @@ def cmd_pull(sample: int, out: Path | None) -> int:
         print(f"--sample must be >= 1 (got {sample})", file=sys.stderr)
         return 2
     rc = RaindropClient()
-    _report_pruned()
-    done = load_worklog()
-    cands = [x for x in pull_untagged(rc) if x["id"] not in done]
-    rc.close()
+    try:
+        _report_pruned()
+        done = load_worklog()
+        cands = [x for x in pull_untagged(rc) if x["id"] not in done]
+    finally:
+        rc.close()
     print(f"untagged candidates: {len(cands)} (worklog done: {len(done)})")
     if not cands:
         print("nothing to do")
@@ -193,7 +214,7 @@ def _parse_custom(path: Path) -> dict:
     out: dict = {"status_axis": None, "status_tags": None,
                  "domains_append": {}, "renames": []}
     try:
-        lines = path.read_text().splitlines()
+        lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
         return out
     section = None  # None | "domains_append" | "renames"
@@ -248,7 +269,7 @@ def load_vocabulary(vocab_path: Path = _VOCAB_PATH,
     (off by default, per vocabulary.md) and is enabled only by the custom
     file: status_axis_enabled: true turns on every status tag, or
     status_tags: [...] turns on a selective list."""
-    data = json.loads(vocab_path.read_text())
+    data = json.loads(vocab_path.read_text(encoding="utf-8"))
     members = set(data["domains"])
     for leaves in data["domains"].values():
         members.update(leaves)
@@ -282,6 +303,7 @@ def load_vocabulary(vocab_path: Path = _VOCAB_PATH,
         "tag_cap": data["tag_cap"],
         "domain_cap": data["domain_cap"],
         "free_cap": data["free_cap"],
+        "status_cap": data["status_cap"],
     }
 
 
@@ -327,6 +349,12 @@ def validate(rec: dict, f: dict | None = None) -> list[str]:
         issues.append("cap>6")
     if len(set(f["tags"])) != len(f["tags"]):
         issues.append("duplicate-tags")
+    free_tags = f.get("free") or []
+    if len(free_tags) > VOCAB["free_cap"]:
+        issues.append(f"free-cap:{len(free_tags)}>{VOCAB['free_cap']}")
+    status_tags = f.get("status") or []
+    if len(status_tags) > VOCAB["status_cap"]:
+        issues.append(f"status-cap:{len(status_tags)}>{VOCAB['status_cap']}")
     if not f["type"] or f["type"] not in VOCAB["types"]:
         issues.append(f"type-invalid:{f['type']!r}")
     if not 1 <= len(f["domain"]) <= VOCAB["domain_cap"]:
@@ -353,7 +381,17 @@ def validate(rec: dict, f: dict | None = None) -> list[str]:
 
 def cmd_plan(cls_path: Path, out: Path | None) -> int:
     """Render classification JSON into a review plan. Zero writes."""
-    records = json.loads(cls_path.read_text())
+    try:
+        records = json.loads(cls_path.read_text(encoding="utf-8"))
+    except OSError as e:
+        print(f"cannot read class file {cls_path}: {e}", file=sys.stderr)
+        return 2
+    except json.JSONDecodeError as e:
+        print(f"invalid JSON in {cls_path}: {e}", file=sys.stderr)
+        return 2
+    if not isinstance(records, list):
+        print(f"class file {cls_path} must be a JSON array of records", file=sys.stderr)
+        return 2
     out = out or (STATE_DIR / f"plan-{time.strftime('%Y%m%d-%H%M%S')}.md")
     n_ok = sum(1 for r in records if r.get("tier") != "manual")
     by_tier: dict[str, int] = {}
@@ -434,8 +472,17 @@ def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
     if limit < 0:
         print(f"--limit must be >= 0 (got {limit})", file=sys.stderr)
         return 2
-    rc = RaindropClient()
-    records = json.loads(cls_path.read_text())
+    try:
+        records = json.loads(cls_path.read_text(encoding="utf-8"))
+    except OSError as e:
+        print(f"cannot read class file {cls_path}: {e}", file=sys.stderr)
+        return 2
+    except json.JSONDecodeError as e:
+        print(f"invalid JSON in {cls_path}: {e}", file=sys.stderr)
+        return 2
+    if not isinstance(records, list):
+        print(f"class file {cls_path} must be a JSON array of records", file=sys.stderr)
+        return 2
     status = load_worklog()
     pending = [r for r in records if _record_pending(r, status)]
     if limit:
@@ -443,6 +490,7 @@ def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
     if not pending:
         print("nothing pending (no classified-dryrun ids match this class file)")
         return 0
+    rc = RaindropClient()
     undo_path = STATE_DIR / f"apply-{time.strftime('%Y%m%d-%H%M%S')}.undo.json"
     print(f"applying {len(pending)} items (what={sorted(what)}), undo -> {undo_path}")
 
@@ -519,9 +567,11 @@ def cmd_apply(cls_path: Path, limit: int, what: set[str]) -> int:
 
 def cmd_stats() -> int:
     rc = RaindropClient()
-    _report_pruned()
-    items = rc.list_all(0)
-    rc.close()
+    try:
+        _report_pruned()
+        items = rc.list_all(0)
+    finally:
+        rc.close()
     total = len(items)
     tagged = sum(1 for x in items if x.get("tags"))
     noted = sum(1 for x in items if (x.get("note") or "").strip())

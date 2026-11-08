@@ -93,6 +93,11 @@ references/
 scripts/
   rd_client.py                      # REST 客户端：批量读、核验写、自测
   organize.py                       # 批处理引擎：pull / plan / apply / stats
+tests/
+  test_organize.py                  # 批处理引擎单元测试（词表、状态机）
+  test_rd_client.py                 # REST 客户端单元测试（重试、防护、回读）
+.github/
+  workflows/ci.yml                  # 共享 CI：编译 + ruff（error 级）+ 测试
 ```
 
 ## 相关 skill

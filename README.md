@@ -95,6 +95,11 @@ references/
 scripts/
   rd_client.py                      # REST client: bulk reads, verified writes, self-test
   organize.py                       # batch engine: pull / plan / apply / stats
+tests/
+  test_organize.py                  # batch-engine unit tests (vocabulary, state machine)
+  test_rd_client.py                 # REST-client unit tests (retry, guards, readback)
+.github/
+  workflows/ci.yml                  # shared CI: compile + ruff (error-level) + tests
 ```
 
 ## Related skills
